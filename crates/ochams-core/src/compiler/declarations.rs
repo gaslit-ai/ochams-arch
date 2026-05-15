@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 
 use super::Compiler;
-use super::model::{
-    CheckedSourceUnit, EdgeRef, NodeRef, RelationRef, SymbolDeclaration, node_region,
-};
+use super::model::{CheckedSourceUnit, EdgeRef, NodeRef, RelationRef, SymbolDeclaration};
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::graph::SymbolIdentity;
 use crate::layout::{LayoutInfo, LayoutRegion};
+use crate::policy::{self, DeclarationKind, DeclarationPermission};
 use crate::syntax::Statement;
 
 impl Compiler {
@@ -25,29 +24,45 @@ impl Compiler {
 
             for statement in &body {
                 match statement {
-                    Statement::Kind { name, span } => match &layout.region {
-                        LayoutRegion::VocabularyKinds { class } => {
-                            let symbol = format!("{module_full}.{name}");
-                            let record = SymbolDeclaration::Kind {
-                                identity: identity(&layout, &symbol, name, span),
-                                class: class.clone(),
-                            };
-                            insert_symbol(&mut self.diagnostics, symbols, record);
-                            unit.insert_local_symbol(name.clone(), symbol);
+                    Statement::Kind { name, span } => {
+                        match policy::declaration_permission(
+                            layout.region.declaration_authority(),
+                            DeclarationKind::Kind,
+                        ) {
+                            DeclarationPermission::Allowed => {
+                                let LayoutRegion::VocabularyKinds { class } = &layout.region else {
+                                    unreachable!(
+                                        "kind declarations are allowed only in vocabulary/kinds"
+                                    )
+                                };
+                                let symbol = format!("{module_full}.{name}");
+                                let record = SymbolDeclaration::Kind {
+                                    identity: identity(&layout, &symbol, name, span),
+                                    class: class.clone(),
+                                };
+                                insert_symbol(&mut self.diagnostics, symbols, record);
+                                unit.insert_local_symbol(name.clone(), symbol);
+                            }
+                            DeclarationPermission::Denied(message) => {
+                                invalid_location(&mut self.diagnostics, statement, message);
+                            }
                         }
-                        _ => invalid_location(
-                            &mut self.diagnostics,
-                            statement,
-                            "kind declarations belong in vocabulary/kinds/**",
-                        ),
-                    },
+                    }
                     Statement::Relation {
                         name,
                         source_kind,
                         target_kind,
                         span,
-                    } => match &layout.region {
-                        LayoutRegion::VocabularyRelations { class } => {
+                    } => match policy::declaration_permission(
+                        layout.region.declaration_authority(),
+                        DeclarationKind::Relation,
+                    ) {
+                        DeclarationPermission::Allowed => {
+                            let LayoutRegion::VocabularyRelations { class } = &layout.region else {
+                                unreachable!(
+                                    "relation declarations are allowed only in vocabulary/relations"
+                                )
+                            };
                             let symbol = format!("{module_full}.{name}");
                             let record = SymbolDeclaration::Relation {
                                 identity: identity(&layout, &symbol, name, span),
@@ -63,32 +78,32 @@ impl Compiler {
                                 span: span.clone(),
                             });
                         }
-                        _ => invalid_location(
-                            &mut self.diagnostics,
-                            statement,
-                            "relation declarations belong in vocabulary/relations/**",
-                        ),
+                        DeclarationPermission::Denied(message) => {
+                            invalid_location(&mut self.diagnostics, statement, message);
+                        }
                     },
                     Statement::Node { name, kind, span } => {
-                        if node_region(&layout.region).is_some() {
-                            let symbol = format!("{module_full}.{name}");
-                            let record = SymbolDeclaration::Node {
-                                identity: identity(&layout, &symbol, name, span),
-                            };
-                            insert_symbol(&mut self.diagnostics, symbols, record);
-                            unit.insert_local_symbol(name.clone(), symbol.clone());
-                            node_refs.push(NodeRef {
-                                file_index,
-                                symbol,
-                                kind: kind.clone(),
-                                span: span.clone(),
-                            });
-                        } else {
-                            invalid_location(
-                                &mut self.diagnostics,
-                                statement,
-                                "node declarations belong in domain/**, capabilities/**, or boundaries/**",
-                            );
+                        match policy::declaration_permission(
+                            layout.region.declaration_authority(),
+                            DeclarationKind::Node,
+                        ) {
+                            DeclarationPermission::Allowed => {
+                                let symbol = format!("{module_full}.{name}");
+                                let record = SymbolDeclaration::Node {
+                                    identity: identity(&layout, &symbol, name, span),
+                                };
+                                insert_symbol(&mut self.diagnostics, symbols, record);
+                                unit.insert_local_symbol(name.clone(), symbol.clone());
+                                node_refs.push(NodeRef {
+                                    file_index,
+                                    symbol,
+                                    kind: kind.clone(),
+                                    span: span.clone(),
+                                });
+                            }
+                            DeclarationPermission::Denied(message) => {
+                                invalid_location(&mut self.diagnostics, statement, message);
+                            }
                         }
                     }
                     Statement::Edge {
@@ -97,20 +112,22 @@ impl Compiler {
                         target,
                         span,
                     } => {
-                        if node_region(&layout.region).is_some() {
-                            edge_refs.push(EdgeRef {
-                                file_index,
-                                source: source.clone(),
-                                relation: relation.clone(),
-                                target: target.clone(),
-                                span: span.clone(),
-                            });
-                        } else {
-                            invalid_location(
-                                &mut self.diagnostics,
-                                statement,
-                                "edge declarations belong in domain/**, capabilities/**, or boundaries/**",
-                            );
+                        match policy::declaration_permission(
+                            layout.region.declaration_authority(),
+                            DeclarationKind::Edge,
+                        ) {
+                            DeclarationPermission::Allowed => {
+                                edge_refs.push(EdgeRef {
+                                    file_index,
+                                    source: source.clone(),
+                                    relation: relation.clone(),
+                                    target: target.clone(),
+                                    span: span.clone(),
+                                });
+                            }
+                            DeclarationPermission::Denied(message) => {
+                                invalid_location(&mut self.diagnostics, statement, message);
+                            }
                         }
                     }
                     Statement::Use { .. } => {}

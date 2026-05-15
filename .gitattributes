@@ -1,0 +1,6 @@
+* text=auto
+*.md text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.arch text eol=lf
+tests/fixtures/** text eol=lf

@@ -1,4 +1,5 @@
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::policy::{self, DeclarationAuthority, SourceStatus, VocabularyChildKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TopRegion {
@@ -17,9 +18,7 @@ pub enum LayoutRegion {
     Workspace,
     VocabularyKinds { class: String },
     VocabularyRelations { class: String },
-    Domain,
-    Capabilities,
-    Boundaries,
+    Authoring { top: TopRegion },
     Reserved { top: TopRegion },
     Unknown,
 }
@@ -31,24 +30,30 @@ impl LayoutRegion {
             Self::VocabularyKinds { .. } | Self::VocabularyRelations { .. } => {
                 TopRegion::Vocabulary
             }
-            Self::Domain => TopRegion::Domain,
-            Self::Capabilities => TopRegion::Capabilities,
-            Self::Boundaries => TopRegion::Boundaries,
+            Self::Authoring { top } => *top,
             Self::Reserved { top } => *top,
             Self::Unknown => TopRegion::Unknown,
         }
     }
 
     pub fn is_active_source(&self) -> bool {
-        matches!(
-            self,
-            Self::Workspace
-                | Self::VocabularyKinds { .. }
-                | Self::VocabularyRelations { .. }
-                | Self::Domain
-                | Self::Capabilities
-                | Self::Boundaries
-        )
+        match self {
+            Self::Workspace => true,
+            Self::VocabularyKinds { .. }
+            | Self::VocabularyRelations { .. }
+            | Self::Authoring { .. } => policy::is_active_source_top(self.top()),
+            Self::Reserved { .. } | Self::Unknown => false,
+        }
+    }
+
+    pub fn declaration_authority(&self) -> DeclarationAuthority {
+        match self {
+            Self::Workspace => DeclarationAuthority::Workspace,
+            Self::VocabularyKinds { .. } => DeclarationAuthority::VocabularyKinds,
+            Self::VocabularyRelations { .. } => DeclarationAuthority::VocabularyRelations,
+            Self::Authoring { top } | Self::Reserved { top } => DeclarationAuthority::Top(*top),
+            Self::Unknown => DeclarationAuthority::Unknown,
+        }
     }
 }
 
@@ -59,23 +64,6 @@ pub struct LayoutInfo {
     pub derived_module: Option<String>,
     pub region: LayoutRegion,
 }
-
-const KIND_CLASSES: &[&str] = &[
-    "primitive",
-    "domain",
-    "capability",
-    "boundary",
-    "realization",
-    "evidence",
-];
-
-const RELATION_CLASSES: &[&str] = &[
-    "structural",
-    "behavioral",
-    "boundary",
-    "realization",
-    "evidential",
-];
 
 pub fn classify(rel_path: &str) -> (LayoutInfo, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
@@ -135,67 +123,27 @@ pub fn valid_identifier(value: &str) -> bool {
     chars.all(|char| char.is_ascii_alphanumeric() || char == '_')
 }
 
-pub fn reference_allowed(from: TopRegion, to: TopRegion) -> bool {
-    match from {
-        TopRegion::Vocabulary => to == TopRegion::Vocabulary,
-        TopRegion::Domain => matches!(to, TopRegion::Vocabulary | TopRegion::Domain),
-        TopRegion::Capabilities => {
-            matches!(
-                to,
-                TopRegion::Vocabulary | TopRegion::Domain | TopRegion::Capabilities
-            )
-        }
-        TopRegion::Boundaries => {
-            matches!(
-                to,
-                TopRegion::Vocabulary
-                    | TopRegion::Domain
-                    | TopRegion::Capabilities
-                    | TopRegion::Boundaries
-            )
-        }
-        TopRegion::Realization | TopRegion::Evidence | TopRegion::Views | TopRegion::Unknown => {
-            false
-        }
-    }
-}
-
 fn region_for(
     components: &[&str],
     rel_path: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> LayoutRegion {
-    match components.get(1).copied() {
-        Some("vocabulary") => vocabulary_region(components, rel_path, diagnostics),
-        Some("domain") => LayoutRegion::Domain,
-        Some("capabilities") => LayoutRegion::Capabilities,
-        Some("boundaries") => LayoutRegion::Boundaries,
-        Some("realization") => {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::Och019,
-                format!("reserved region contains .arch source: {rel_path}"),
-            ));
-            LayoutRegion::Reserved {
-                top: TopRegion::Realization,
-            }
+    match components
+        .get(1)
+        .and_then(|segment| policy::top_region_policy_for_segment(segment))
+    {
+        Some(policy) if policy.top == TopRegion::Vocabulary => {
+            vocabulary_region(components, rel_path, diagnostics)
         }
-        Some("evidence") => {
+        Some(policy) if policy.source_status == SourceStatus::Reserved => {
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::Och019,
                 format!("reserved region contains .arch source: {rel_path}"),
             ));
-            LayoutRegion::Reserved {
-                top: TopRegion::Evidence,
-            }
+            LayoutRegion::Reserved { top: policy.top }
         }
-        Some("views") => {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::Och019,
-                format!("reserved region contains .arch source: {rel_path}"),
-            ));
-            LayoutRegion::Reserved {
-                top: TopRegion::Views,
-            }
+        Some(policy) if policy.source_status == SourceStatus::Active => {
+            LayoutRegion::Authoring { top: policy.top }
         }
         _ => {
             diagnostics.push(Diagnostic::new(
@@ -212,10 +160,13 @@ fn vocabulary_region(
     rel_path: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> LayoutRegion {
-    match components.get(2).copied() {
-        Some("kinds") => {
+    match components
+        .get(2)
+        .and_then(|segment| policy::vocabulary_child_policy(segment))
+    {
+        Some(child) if child.kind == VocabularyChildKind::Kinds => {
             let class = vocabulary_class(components);
-            if !KIND_CLASSES.contains(&class.as_str()) {
+            if !policy::is_known_kind_class(&class) {
                 diagnostics.push(Diagnostic::new(
                     DiagnosticCode::Och023,
                     format!("unknown kind class `{class}` in {rel_path}"),
@@ -223,9 +174,9 @@ fn vocabulary_region(
             }
             LayoutRegion::VocabularyKinds { class }
         }
-        Some("relations") => {
+        Some(child) if child.kind == VocabularyChildKind::Relations => {
             let class = vocabulary_class(components);
-            if !RELATION_CLASSES.contains(&class.as_str()) {
+            if !policy::is_known_relation_class(&class) {
                 diagnostics.push(Diagnostic::new(
                     DiagnosticCode::Och024,
                     format!("unknown relation class `{class}` in {rel_path}"),
@@ -233,7 +184,7 @@ fn vocabulary_region(
             }
             LayoutRegion::VocabularyRelations { class }
         }
-        Some("rules") => {
+        Some(child) if child.kind == VocabularyChildKind::Reserved => {
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::Och019,
                 format!("reserved region contains .arch source: {rel_path}"),

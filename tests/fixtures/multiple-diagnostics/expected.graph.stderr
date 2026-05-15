@@ -1,0 +1,3 @@
+OCH003 architecture/domain/resources/pet.arch is missing a space declaration
+architecture/domain/resources/pet.arch:0..13: OCH001 could not parse statement `bad statement`
+architecture/domain/resources/pet.arch:14..26: OCH001 invalid identifier `1Entity`

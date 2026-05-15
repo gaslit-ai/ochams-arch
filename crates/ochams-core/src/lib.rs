@@ -12,6 +12,7 @@ mod compiler;
 mod diagnostic;
 mod graph;
 mod layout;
+mod policy;
 mod query;
 mod syntax;
 

@@ -9,7 +9,8 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode, SourceSpan};
 use crate::graph::{
     EdgeRecord, KindRecord, NodeRecord, RelationRecord, SymbolCategory, SymbolRecord,
 };
-use crate::layout::{TopRegion, reference_allowed};
+use crate::layout::TopRegion;
+use crate::policy::reference_allowed;
 use crate::syntax::{Statement, SymbolRef};
 
 impl Compiler {

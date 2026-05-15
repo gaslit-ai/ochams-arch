@@ -62,6 +62,8 @@ match compilation.graph {
 
 The public graph surface is projection-oriented. `Graph::projection()` returns `GraphProjection` and the stable view records `GraphWorkspaceSource`, `GraphSource`, `GraphKind`, `GraphRelation`, `GraphNode`, and `GraphEdge`. Raw compiler records remain internal.
 
+Diagnostics are part of the same public contract. `DiagnosticCode::ALL` is the code-owned catalog in canonical order, and `DiagnosticCode::as_str()` returns the stable `OCH###` text used by `format_diagnostics`.
+
 `ochams-core` denies undocumented public items. Rustdoc therefore describes the exported compiler contract, while generated documentation remains a disposable projection of the source.
 
 The snippet above shows the primary flow. Supporting exported types such as diagnostics, source spans, compilation results, and graph projection records are part of the Rustdoc contract too.
@@ -73,5 +75,8 @@ cargo fmt --check
 cargo check
 cargo clippy -- -D warnings
 cargo test
+cargo verify-fixtures
 cargo doc --no-deps
 ```
+
+`cargo verify-fixtures` checks the committed command fixtures without writing fixture files and enforces the Cargo lockfile while building the CLI. `cargo regenerate-fixtures` rewrites fixture projections from the current `ochams` CLI; review those diffs before keeping them.

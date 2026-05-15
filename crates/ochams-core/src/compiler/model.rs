@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use crate::diagnostic::{DiagnosticCode, SourceSpan};
 use crate::graph::{EdgeRecord, SymbolCategory, SymbolIdentity};
 use crate::layout::{LayoutInfo, LayoutRegion};
+use crate::policy;
 use crate::syntax::{ParsedFile, Statement, SymbolRef};
 
 #[derive(Debug, Clone)]
@@ -207,21 +208,11 @@ pub(super) enum ExpectedCategory {
 }
 
 pub(super) fn node_region(region: &LayoutRegion) -> Option<&'static str> {
-    match region {
-        LayoutRegion::Domain => Some("domain"),
-        LayoutRegion::Capabilities => Some("capability"),
-        LayoutRegion::Boundaries => Some("boundary"),
-        _ => None,
-    }
+    policy::node_kind_class_for_top(region.top()).map(|class| class.as_str())
 }
 
 pub(super) fn edge_region(region: &LayoutRegion) -> Option<&'static str> {
-    match region {
-        LayoutRegion::Domain => Some("structural"),
-        LayoutRegion::Capabilities => Some("behavioral"),
-        LayoutRegion::Boundaries => Some("boundary"),
-        _ => None,
-    }
+    policy::edge_relation_class_for_top(region.top()).map(|class| class.as_str())
 }
 
 pub(super) fn missing_code(expected: ExpectedCategory) -> DiagnosticCode {

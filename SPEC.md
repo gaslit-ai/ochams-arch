@@ -1113,6 +1113,24 @@ Each phase must produce diagnostics without requiring later phases to guess what
 
 After compilation, callers may render diagnostics, project graph JSON, or run query formatting. Those reporting operations must not change the compiled graph.
 
+### Finite Policy Authority
+
+Closed compiler policy is represented as typed data plus explicit evaluator functions inside the compiler core. This includes:
+
+```text
+canonical top-level regions
+reserved versus active source regions
+vocabulary child positions
+built-in kind classes
+built-in relation classes
+region declaration permissions
+region reference direction
+```
+
+These finite tables are semantic authority. Parser behavior, source discovery, layout classification, declaration collection, resolution, and semantic checks must consume the same evaluator functions rather than cloning the same matrix in separate control flow.
+
+The Compiler MVP does not use procedural macros, generated Rust, build scripts, or generated projections to decide accepted source, source spans, relation compatibility, or public output. A local declarative macro may be used only for a mechanical catalog when the invocation visibly contains every public fact and the expansion is a bijective transposition into ordinary Rust items or match arms. If generation is introduced later, it must be an explicit maintainer command with a verification mode, and public contract tests must exercise the generated projection before generated implementation can become trusted.
+
 ### Reporting Responsibilities
 
 The core crate owns deterministic rendering that is part of the compiler contract: diagnostic text, graph JSON, and query text. The CLI owns command parsing, exit codes, stream selection, and terminal policy. Editor and future LSP adapters should translate core diagnostics and graph facts into editor protocol data without adding compiler rules.
@@ -1312,36 +1330,9 @@ optional primary span
 
 Severity, labels, notes, line/column rendering, and richer editor payloads are deferred until the language needs multi-span diagnostics. CLI rendering is diagnostic-code-first and deterministic.
 
-Diagnostic examples:
+The authoritative diagnostic identity catalog is the `DiagnosticCode` catalog in `ochams-core`. `DiagnosticCode::ALL` exposes the canonical order; `DiagnosticCode::as_str` exposes the stable `OCH###` text. A local declarative macro may maintain this catalog only while its invocation includes every public variant name, every stable code string, and the Rustdoc for each public variant. The macro must not decide diagnostic messages, source spans, phase ordering, or semantic acceptance.
 
-```text
-OCH001 parse error
-OCH002 missing workspace file
-OCH003 missing space declaration
-OCH004 incompatible root space
-OCH005 missing module declaration
-OCH006 module path mismatch
-OCH007 unknown layout region
-OCH008 invalid declaration location
-OCH009 duplicate symbol
-OCH010 missing symbol
-OCH011 ambiguous symbol
-OCH012 invalid dotted reference
-OCH013 unknown kind
-OCH014 unknown relation
-OCH015 relation endpoint kind mismatch
-OCH016 node kind class not permitted in region
-OCH017 edge relation class not permitted in region
-OCH018 invalid region reference
-OCH019 reserved region contains `.arch` source
-OCH020 invalid command or graph projection request
-OCH021 symbol category mismatch
-OCH022 malformed path segment
-OCH023 unknown kind class
-OCH024 unknown relation class
-```
-
-The compiler core owns diagnostic data and deterministic plain-text diagnostic rendering. The CLI owns command routing, exit codes, stream selection, and terminal policy such as color. Some repository-level diagnostics, such as a missing `architecture/workspace.arch`, may not have a source span.
+The compiler core owns diagnostic data and deterministic plain-text diagnostic rendering. The CLI owns command routing, exit codes, stream selection, and terminal policy such as color. Some repository-level diagnostics, such as a missing `architecture/workspace.arch`, may not have a source span. Core rendering sorts diagnostics by optional path, optional start offset, optional end offset, diagnostic code, and message before rendering; unspanned diagnostics sort before spanned diagnostics.
 
 Diagnostic precedence:
 
@@ -1365,16 +1356,25 @@ edge target reference            must resolve to node
 
 ## MVP Fixtures
 
-The first implementation is driven by repository-shaped fixtures, not isolated parser strings. The public command contract uses root-level golden fixtures under `tests/fixtures/`. Narrow semantic checks construct small repository trees inside tests when an inline fixture is clearer than a directory snapshot.
+The first implementation is driven by repository-shaped fixtures, not isolated parser strings. The public command contract uses root-level golden fixtures under `tests/fixtures/`. Reusable semantic seed repos live separately under `tests/seeds/` so command-fixture review and semantic-test baselines do not become the same physical authority. Narrow semantic checks still construct small repository trees inline when a targeted delta is clearer than a checked-in seed directory.
 
-Golden command fixture scenarios:
+Golden command fixture scenarios are authoritative by whatever `tests/fixtures/*/commands.txt` declares. The current checked-in cases include:
 
 ```text
 valid-minimal/
   proves workspace, vocabulary, two domain nodes, one structural edge, and graph JSON
+
+duplicate-edge/
+  proves duplicate edge declarations coalesce in the public graph and query views
+
+missing-space/
+  proves public commands fail deterministically when an active source omits `space`
+
+multiple-diagnostics/
+  proves public commands preserve deterministic multi-diagnostic stderr ordering
 ```
 
-Inline semantic coverage scenarios:
+Semantic seed and inline coverage scenarios:
 
 ```text
 
@@ -1441,6 +1441,7 @@ Golden command fixture convention:
 tests/fixtures/<case>/
 ├── repo/
 │   └── architecture/
+├── commands.txt
 ├── expected.check.exit
 ├── expected.check.stdout
 ├── expected.check.stderr
@@ -1453,9 +1454,32 @@ tests/fixtures/<case>/
 └── expected.query.stderr
 ```
 
-`expected.<command>.exit` marks a command as part of the fixture. The fixture harness discovers every fixture directory and runs every command with an `expected.<command>.exit` file. Missing stdout or stderr files for an exercised command mean the stream is expected to be empty. Existing expected stream files must be readable UTF-8; unreadable or malformed files are fixture errors, not empty streams. `query.symbol` supplies the fully qualified query argument for `expected.query.*` files.
+`commands.txt` is the human-authored fixture manifest. It lists one command name per line from `check`, `graph`, and `query`; blank lines and `#` comments are ignored. The fixture harness discovers every fixture directory and runs only the commands declared by `commands.txt`. Expected files are reviewed command-output oracles and must not decide coverage. Expected files or `query.symbol` for undeclared commands are stale fixture-authority errors.
+
+For each declared command, `expected.<command>.exit` is required. Missing stdout or stderr files for an exercised command mean the stream is expected to be empty. Existing expected stream files must be readable UTF-8; unreadable or malformed files are fixture errors, not empty streams. `graph` stdout must use `expected.graph.stdout.json`; plain `expected.graph.stdout` is a fixture error. `check` and `query` stdout must use `expected.<command>.stdout`; `.stdout.json` is a fixture error for non-JSON commands. `query.symbol` supplies the fully qualified query argument for `expected.query.*` files.
+
+The shared fixture helper owns only fixture contract mechanics: manifest parsing, fixture discovery, expected stream lookup, and stdout naming validation. Tests for that helper must exercise those mechanics directly. Semantic compiler behavior is still proved by running the public core API, CLI fixtures, and explicit maintainer fixture verification commands against reviewed expected outputs.
+
+Checked-in semantic seed repos under `tests/seeds/` are the preferred seed corpus for semantic integration tests when they already express the needed base architecture shape. Golden command fixtures under `tests/fixtures/` remain the reviewed public command corpus. Inline test-only repository synthesis should remain for targeted deltas and bespoke failure shapes, not as a second hand-maintained copy of the same reviewed seed tree.
 
 Invalid-repository fixtures should pin failure behavior for every public command they can exercise. At minimum, one invalid fixture must assert that `check`, `graph --format json`, and `query` fail without stdout leakage and with deterministic diagnostic stderr.
+
+Checked-in `expected.*` files are reviewed contract oracles, not compiler authority. Maintainers verify them with:
+
+```text
+cargo verify-fixtures
+```
+
+That command runs the real `ochams` CLI against every exercised fixture and fails on drift without writing fixture projections or source-controlled files.
+It builds the CLI with Cargo's lockfile enforced so fixture verification does not update dependency resolution as a side effect. It locates the built CLI from Cargo's reported `compiler-artifact` executable path rather than reconstructing a target-directory convention.
+
+Maintainers may update fixture projections with:
+
+```text
+cargo regenerate-fixtures
+```
+
+Regeneration is explicit maintainer tooling. It rewrites expected exit, stdout, and stderr files from current CLI output, removes empty stream files, never runs as part of ordinary compilation, and still requires human review of the resulting diff before the projection becomes a contract update.
 
 ## Determinism
 
@@ -1475,7 +1499,7 @@ preserve source spans for every declaration and edge
 avoid ordinary hash-map iteration in public output
 ```
 
-The repository's `.arch` files are the only authoritative store. Derived outputs may be regenerated at any time.
+The repository's `.arch` files are the only authoritative architecture store. Derived outputs may be regenerated explicitly, but checked-in fixture projections become public command-contract oracles only after review.
 
 ## Internal Architecture
 
@@ -1485,6 +1509,8 @@ The first implementation should become a Rust workspace after the root scaffold 
 crates/
   ochams-core/
   ochams-cli/
+  ochams-fixtures/
+  xtask/
 ```
 
 ### `ochams-core`
@@ -1534,6 +1560,14 @@ Evidence data structures may be introduced after the Compiler MVP, but they are 
 ### `ochams-cli`
 
 Owns command parsing, exit codes, stream selection, and terminal policy. It delegates deterministic diagnostic, graph JSON, and query text rendering to `ochams-core`.
+
+### `ochams-fixtures`
+
+Owns shared golden fixture contract parsing for workspace tests and maintainer tooling. It reads fixture manifests, validates expected-output file naming, and loads expected streams. It must not run the compiler or decide command behavior.
+
+### `xtask`
+
+Owns maintainer-only repository tasks. The Compiler MVP uses it for explicit golden fixture verification and regeneration. It may invoke the built `ochams` CLI, but it must not contain compiler semantics and must not mutate checked-in projections except through an explicit regeneration command.
 
 ### Deferred Crates
 

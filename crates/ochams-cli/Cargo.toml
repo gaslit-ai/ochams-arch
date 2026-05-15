@@ -13,3 +13,6 @@ path = "src/main.rs"
 
 [dependencies]
 ochams-core = { path = "../ochams-core" }
+
+[dev-dependencies]
+ochams-fixtures = { path = "../ochams-fixtures" }

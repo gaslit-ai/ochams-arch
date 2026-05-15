@@ -1,0 +1,3 @@
+[alias]
+verify-fixtures = "run --locked -p xtask -- verify-fixtures"
+regenerate-fixtures = "run --locked -p xtask -- regenerate-fixtures"

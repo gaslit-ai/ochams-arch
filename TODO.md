@@ -197,3 +197,62 @@ This todo list tracks the MVP hardening loop across specification, implementatio
 - [x] Update the spec to record the parsed-source versus checked-source prior.
 - [x] Run full verification, including rustdoc.
 - [x] Spawn devil's-advocate review agents to challenge source-unit invariant closure and behavioral preservation.
+
+## Phase 16: Finite Compiler Policy Authority
+
+- [x] Research current Rust/Cargo macro, build-script, and fixture-tooling guidance against the attached rule bundle.
+- [x] Identify duplicated finite semantic policy in layout classification, source discovery, declaration placement, and reference direction.
+- [x] Create a single typed policy table plus explicit evaluator functions for closed top-level regions, vocabulary children, kind classes, relation classes, declaration placement, and reference direction.
+- [x] Refactor compiler phases to consume the policy evaluators without changing public diagnostics, graph JSON, query output, or CLI behavior.
+- [x] Add executable policy-closure tests that catch duplicate, missing, or drifted policy rows before broader semantic changes.
+- [x] Update the spec so finite policy is documented as compiler-owned semantic authority, not generated code or macro expansion.
+- [x] Run full verification, including rustdoc.
+- [x] Spawn devil's-advocate review agents to challenge finite policy authority and behavior preservation.
+
+## Phase 17: Diagnostic Catalog Mechanical Macro Boundary
+
+- [x] Research current Rust declarative macro guidance against the attached macro and semantic-authority rules.
+- [x] Identify diagnostic-code duplication across enum variants, string rendering, tests, and spec prose.
+- [x] Convert `DiagnosticCode` into a local declarative mechanical catalog whose invocation exposes every public diagnostic identity fact.
+- [x] Keep diagnostic semantics, source spans, rendering order, and phase ownership in ordinary functions, not macro expansion.
+- [x] Add catalog-closure and public rendering tests that fail when a diagnostic row is omitted, reordered, renamed, or assigned the wrong string.
+- [x] Trim the spec so diagnostic catalog authority lives in code while the spec records the boundary and invariants.
+- [x] Run full verification, including rustdoc.
+- [x] Spawn gpt-5.4 high devil's-advocate review agents to challenge the macro boundary, diagnostic contract, and spec alignment.
+
+## Phase 18: Explicit Golden Fixture Tooling
+
+- [x] Research current Cargo external-tool and build-script guidance against the attached projection-regeneration rules.
+- [x] Identify checked-in fixture projections that currently rely on test execution rather than an explicit maintainer command.
+- [x] Add a workspace `xtask` binary with `verify-fixtures` and `regenerate-fixtures` commands.
+- [x] Make fixture verification run the real `ochams` CLI and fail on drift without mutating checked-in artifacts.
+- [x] Make fixture regeneration deterministic, explicit, and separate from ordinary compilation and tests.
+- [x] Add discoverable Cargo aliases and documentation for the fixture commands.
+- [x] Update the spec so checked-in golden fixtures remain reviewed contract oracles while regeneration is a maintainer aid.
+- [x] Run full verification, including the fixture verification command and rustdoc.
+- [x] Spawn gpt-5.4 high devil's-advocate review agents to challenge fixture tooling, projection authority, and spec alignment.
+
+## Phase 19: Fixture Contract Helper Regression Boundary
+
+- [x] Research Cargo integration-test and workspace guidance against the fixture helper boundary.
+- [x] Identify fixture contract rules that are now shared by CLI tests and maintainer tooling but not directly regression-tested.
+- [x] Add focused tests for explicit command manifests, fixture discovery, expected exit parsing, empty stream defaults, and stdout naming rules.
+- [x] Keep helper tests local to fixture contract behavior without generating semantic implementation or fixture projections.
+- [x] Update the spec only where fixture helper invariants need high-level guidance.
+- [x] Run full verification, including fixture verification and rustdoc.
+- [x] Spawn gpt-5.4 high devil's-advocate review agents to challenge fixture helper coverage, contract authority, and spec alignment.
+- [x] Fix review finding by deriving the built CLI path from Cargo `compiler-artifact` output instead of target-directory guesses.
+- [x] Fix review finding by rejecting orphaned expected files and `query.symbol` files for undeclared commands.
+- [x] Fix review finding by covering malformed expected streams and regeneration file mutation in focused tests.
+
+## Phase 20: Repository-Wide Fixture Seed Reuse
+
+- [x] Read the repository as one testing system and identify where checked-in fixture repos and inline semantic test repos duplicate the same architecture shapes.
+- [x] Reuse checked-in semantic seed repos as seed inputs for compiler tests wherever the seed already expresses the needed base shape.
+- [x] Keep inline repository synthesis only for tests that genuinely need bespoke shapes or targeted mutations not represented by reviewed fixtures.
+- [x] Update the lean spec only if the testing prior changes in a way that matters beyond one file.
+- [x] Run full verification, including fixture verification and rustdoc.
+- [x] Spawn gpt-5.4 high devil's-advocate review agents to challenge the repo-wide test-topology simplification and spec alignment.
+- [x] Fix review finding by separating semantic seed repos from public golden command fixtures.
+- [x] Fix review finding by tightening seeded negative tests from “contains code” to exact diagnostic-code sets where the scenario is single-failure by construction.
+- [x] Fix review finding by reusing the checked-in `missing-space` seed and documenting the broader checked-in fixture corpus.

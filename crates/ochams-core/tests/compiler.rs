@@ -9,8 +9,7 @@ use ochams_core::{
 
 #[test]
 fn valid_minimal_graph_and_query() {
-    let root = fixture("valid_minimal_graph_and_query");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("valid_minimal_graph_and_query", "valid-minimal");
 
     let compilation = compile(&root);
 
@@ -33,8 +32,10 @@ fn valid_minimal_graph_and_query() {
 
 #[test]
 fn public_graph_projection_types_are_nameable() {
-    let root = fixture("public_graph_projection_types_are_nameable");
-    write_valid_minimal(&root);
+    let root = seeded_fixture(
+        "public_graph_projection_types_are_nameable",
+        "valid-minimal",
+    );
 
     let graph = compile(&root).graph.expect("valid graph");
     let projection: GraphProjection = graph.projection();
@@ -57,13 +58,7 @@ fn public_graph_projection_types_are_nameable() {
 
 #[test]
 fn duplicate_edges_are_coalesced_in_json() {
-    let root = fixture("duplicate_edges_are_coalesced_in_json");
-    write_valid_minimal(&root);
-    write(
-        &root,
-        "architecture/domain/resources/pet-links.arch",
-        "space VetClinic\nmodule Domain.Resources\n\nuse VetClinic.Domain.Resources.Pet\nuse VetClinic.Vocabulary.Relations.has\nuse VetClinic.Domain.Resources.Appointment\n\nedge Pet has Appointment\n",
-    );
+    let root = seeded_fixture("duplicate_edges_are_coalesced_in_json", "duplicate-edge");
 
     let graph = compile(&root).graph.expect("valid graph");
     let projection = graph.projection();
@@ -128,8 +123,7 @@ fn fully_qualified_references_resolve_without_imports() {
 
 #[test]
 fn query_renders_kind_and_relation_context() {
-    let root = fixture("query_renders_kind_and_relation_context");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("query_renders_kind_and_relation_context", "valid-minimal");
     let graph = compile(&root).graph.expect("valid graph");
 
     let kind_query = format_query(&graph, "VetClinic.Vocabulary.Kinds.Entity").expect("kind query");
@@ -164,8 +158,7 @@ fn query_renders_kind_and_relation_context() {
 
 #[test]
 fn graph_debug_reports_projection_summary() {
-    let root = fixture("graph_debug_reports_projection_summary");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("graph_debug_reports_projection_summary", "valid-minimal");
     append(
         &root,
         "architecture/domain/resources/appointment.arch",
@@ -207,37 +200,29 @@ fn architecture_symlink_root_is_not_followed() {
     use std::os::unix::fs::symlink;
 
     let root = fixture("architecture_symlink_root_is_not_followed");
-    let target = fixture("architecture_symlink_root_target");
-    write_valid_minimal(&target);
+    let target = seeded_fixture("architecture_symlink_root_target", "valid-minimal");
     symlink(target.join("architecture"), root.join("architecture")).expect("symlink");
 
-    assert_has_code(&root, DiagnosticCode::Och002);
+    assert_codes(&root, &[DiagnosticCode::Och002]);
 }
 
 #[test]
 fn incompatible_root_space_is_reported() {
-    let root = fixture("incompatible_root_space_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("incompatible_root_space_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/domain/resources/pet.arch",
         "space Other\nmodule Domain.Resources\n\nuse VetClinic.Vocabulary.Kinds.Entity\n\nnode Pet : Entity\n",
     );
 
-    assert_has_code(&root, DiagnosticCode::Och004);
+    assert_codes(&root, &[DiagnosticCode::Och004]);
 }
 
 #[test]
 fn missing_space_is_reported() {
-    let root = fixture("missing_space_is_reported");
-    write(&root, "architecture/workspace.arch", "space VetClinic\n");
-    write(
-        &root,
-        "architecture/domain/resources/pet.arch",
-        "module Domain.Resources\n",
-    );
+    let root = seeded_fixture("missing_space_is_reported", "missing-space");
 
-    assert_has_code(&root, DiagnosticCode::Och003);
+    assert_codes(&root, &[DiagnosticCode::Och003]);
 }
 
 #[test]
@@ -348,41 +333,38 @@ fn invalid_relation_location_is_reported() {
 
 #[test]
 fn duplicate_symbol_is_reported() {
-    let root = fixture("duplicate_symbol_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("duplicate_symbol_is_reported", "valid-minimal");
     append(
         &root,
         "architecture/domain/resources/pet.arch",
         "node Pet : Entity\n",
     );
 
-    assert_has_code(&root, DiagnosticCode::Och009);
+    assert_codes(&root, &[DiagnosticCode::Och009]);
 }
 
 #[test]
 fn invalid_dotted_reference_is_reported() {
-    let root = fixture("invalid_dotted_reference_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("invalid_dotted_reference_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/domain/resources/pet.arch",
         "space VetClinic\nmodule Domain.Resources\n\nnode Pet : Domain.Resources.Entity\n",
     );
 
-    assert_has_code(&root, DiagnosticCode::Och012);
+    assert_codes(&root, &[DiagnosticCode::Och012]);
 }
 
 #[test]
 fn missing_symbol_is_reported() {
-    let root = fixture("missing_symbol_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("missing_symbol_is_reported", "valid-minimal");
     append(
         &root,
         "architecture/domain/resources/appointment.arch",
         "edge Pet has Ghost\n",
     );
 
-    assert_has_code(&root, DiagnosticCode::Och010);
+    assert_codes(&root, &[DiagnosticCode::Och010]);
 }
 
 #[test]
@@ -419,6 +401,92 @@ fn reserved_region_source_is_reported() {
     );
 
     assert_has_code(&root, DiagnosticCode::Och019);
+}
+
+#[test]
+fn every_reserved_policy_source_region_is_reported() {
+    let root = fixture("every_reserved_policy_source_region_is_reported");
+    write(&root, "architecture/workspace.arch", "space VetClinic\n");
+    write(
+        &root,
+        "architecture/realization/source-sets/main.arch",
+        "space VetClinic\nmodule Realization.SourceSets\n",
+    );
+    write(
+        &root,
+        "architecture/evidence/static/observed.arch",
+        "space VetClinic\nmodule Evidence.Static\n",
+    );
+    write(
+        &root,
+        "architecture/views/slices/core.arch",
+        "space VetClinic\nmodule Views.Slices\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/rules/constraints.arch",
+        "space VetClinic\nmodule Vocabulary.Rules\n",
+    );
+
+    assert_code_count(&root, DiagnosticCode::Och019, 4);
+}
+
+#[test]
+fn every_active_policy_region_accepts_matching_node_and_edge_classes() {
+    let root = fixture("every_active_policy_region_accepts_matching_node_and_edge_classes");
+    write(&root, "architecture/workspace.arch", "space VetClinic\n");
+    write(
+        &root,
+        "architecture/vocabulary/kinds/domain.arch",
+        "space VetClinic\nmodule Vocabulary.Kinds\n\nkind Entity\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/kinds/capability.arch",
+        "space VetClinic\nmodule Vocabulary.Kinds\n\nkind Operation\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/kinds/boundary.arch",
+        "space VetClinic\nmodule Vocabulary.Kinds\n\nkind Surface\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/relations/structural.arch",
+        "space VetClinic\nmodule Vocabulary.Relations\n\nuse VetClinic.Vocabulary.Kinds.Entity\n\nrelation relates Entity -> Entity\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/relations/behavioral.arch",
+        "space VetClinic\nmodule Vocabulary.Relations\n\nuse VetClinic.Vocabulary.Kinds.Operation\n\nrelation invokes Operation -> Operation\n",
+    );
+    write(
+        &root,
+        "architecture/vocabulary/relations/boundary.arch",
+        "space VetClinic\nmodule Vocabulary.Relations\n\nuse VetClinic.Vocabulary.Kinds.Surface\n\nrelation exposes Surface -> Surface\n",
+    );
+    write(
+        &root,
+        "architecture/domain/resources/pet.arch",
+        "space VetClinic\nmodule Domain.Resources\n\nuse VetClinic.Vocabulary.Kinds.Entity\nuse VetClinic.Vocabulary.Relations.relates\n\nnode Pet : Entity\nnode Visit : Entity\nedge Pet relates Visit\n",
+    );
+    write(
+        &root,
+        "architecture/capabilities/commands/scheduling.arch",
+        "space VetClinic\nmodule Capabilities.Commands\n\nuse VetClinic.Vocabulary.Kinds.Operation\nuse VetClinic.Vocabulary.Relations.invokes\n\nnode Schedule : Operation\nnode Confirm : Operation\nedge Schedule invokes Confirm\n",
+    );
+    write(
+        &root,
+        "architecture/boundaries/inbound/surfaces/http.arch",
+        "space VetClinic\nmodule Boundaries.Inbound.Surfaces\n\nuse VetClinic.Vocabulary.Kinds.Surface\nuse VetClinic.Vocabulary.Relations.exposes\n\nnode Http : Surface\nnode Api : Surface\nedge Http exposes Api\n",
+    );
+
+    let compilation = compile(&root);
+
+    assert_eq!(codes(&compilation), Vec::<DiagnosticCode>::new());
+    let projection = compilation.graph.expect("valid graph").projection();
+    assert_eq!(projection.nodes.len(), 6);
+    assert_eq!(projection.edges.len(), 3);
 }
 
 #[test]
@@ -462,8 +530,7 @@ fn unknown_relation_class_is_reported() {
 
 #[test]
 fn symbol_category_mismatch_is_reported() {
-    let root = fixture("symbol_category_mismatch_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("symbol_category_mismatch_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/domain/resources/pet.arch",
@@ -486,8 +553,7 @@ fn symbol_category_mismatch_is_reported() {
 
 #[test]
 fn node_kind_class_mismatch_is_reported() {
-    let root = fixture("node_kind_class_mismatch_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("node_kind_class_mismatch_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/vocabulary/kinds/boundary.arch",
@@ -520,8 +586,7 @@ fn node_kind_class_mismatch_is_reported() {
 
 #[test]
 fn edge_relation_class_mismatch_is_reported() {
-    let root = fixture("edge_relation_class_mismatch_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("edge_relation_class_mismatch_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/vocabulary/relations/behavioral.arch",
@@ -588,8 +653,7 @@ fn relation_endpoint_kind_mismatch_is_reported() {
 
 #[test]
 fn invalid_region_reference_is_reported() {
-    let root = fixture("invalid_region_reference_is_reported");
-    write_valid_minimal(&root);
+    let root = seeded_fixture("invalid_region_reference_is_reported", "valid-minimal");
     write(
         &root,
         "architecture/vocabulary/kinds/capability.arch",
@@ -620,27 +684,15 @@ fn invalid_region_reference_is_reported() {
     );
 }
 
-fn write_valid_minimal(root: &Path) {
-    write(root, "architecture/workspace.arch", "space VetClinic\n");
-    write(
-        root,
-        "architecture/vocabulary/kinds/domain.arch",
-        "space VetClinic\nmodule Vocabulary.Kinds\n\nkind Entity\n",
-    );
-    write(
-        root,
-        "architecture/vocabulary/relations/structural.arch",
-        "space VetClinic\nmodule Vocabulary.Relations\n\nuse VetClinic.Vocabulary.Kinds.Entity\n\nrelation has Entity -> Entity\n",
-    );
-    write(
-        root,
-        "architecture/domain/resources/pet.arch",
-        "space VetClinic\nmodule Domain.Resources\n\nuse VetClinic.Vocabulary.Kinds.Entity\n\nnode Pet : Entity\n",
-    );
-    write(
-        root,
-        "architecture/domain/resources/appointment.arch",
-        "space VetClinic\nmodule Domain.Resources\n\nuse VetClinic.Vocabulary.Kinds.Entity\nuse VetClinic.Vocabulary.Relations.has\nuse VetClinic.Domain.Resources.Pet\n\nnode Appointment : Entity\nedge Pet has Appointment\n",
+fn assert_codes(root: &Path, expected: &[DiagnosticCode]) {
+    let diagnostics = compile(root).diagnostics;
+    assert_eq!(
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect::<Vec<_>>(),
+        expected,
+        "raw diagnostics: {diagnostics:#?}"
     );
 }
 
@@ -686,6 +738,41 @@ fn fixture(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("ochams-{name}-{nonce}"));
     fs::create_dir_all(&root).expect("fixture root");
     root
+}
+
+fn seeded_fixture(name: &str, case: &str) -> PathBuf {
+    let root = fixture(name);
+    copy_dir_all(&fixture_repo(case), &root);
+    root
+}
+
+fn fixture_repo(case: &str) -> PathBuf {
+    workspace_root().join("tests").join("seeds").join(case)
+}
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .find(|path| path.join("tests").join("seeds").is_dir() && path.join("xtask").is_dir())
+        .expect("workspace root")
+        .to_path_buf()
+}
+
+fn copy_dir_all(source: &Path, destination: &Path) {
+    let entries = fs::read_dir(source).expect("read source directory");
+    fs::create_dir_all(destination).expect("mkdir");
+
+    for entry in entries {
+        let entry = entry.expect("dir entry");
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+
+        if entry.file_type().expect("entry type").is_dir() {
+            copy_dir_all(&source_path, &destination_path);
+        } else {
+            fs::copy(&source_path, &destination_path).expect("copy file");
+        }
+    }
 }
 
 fn write(root: &Path, rel_path: &str, content: &str) {

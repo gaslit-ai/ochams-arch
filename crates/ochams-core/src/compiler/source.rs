@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use super::Compiler;
 use super::model::{DiscoveredSource, ParsedSourceUnit};
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::layout::classify;
+use crate::layout::{TopRegion, classify};
+use crate::policy;
 use crate::syntax::parse_file;
 
 impl Compiler {
@@ -132,16 +133,7 @@ fn validate_layout_directories(architecture: &Path, diagnostics: &mut Vec<Diagno
 
         let name = entry.file_name().to_string_lossy().to_string();
         if metadata.is_dir() {
-            if !matches!(
-                name.as_str(),
-                "vocabulary"
-                    | "domain"
-                    | "capabilities"
-                    | "boundaries"
-                    | "realization"
-                    | "evidence"
-                    | "views"
-            ) {
+            if policy::top_region_policy_for_segment(&name).is_none() {
                 if !contains_arch_source(&entry.path()) {
                     diagnostics.push(Diagnostic::new(
                         DiagnosticCode::Och007,
@@ -151,7 +143,9 @@ fn validate_layout_directories(architecture: &Path, diagnostics: &mut Vec<Diagno
                 continue;
             }
 
-            if name == "vocabulary" {
+            if policy::top_region_policy_for_segment(&name)
+                .is_some_and(|policy| policy.top == TopRegion::Vocabulary)
+            {
                 validate_vocabulary_children(&entry.path(), diagnostics);
             }
         }
@@ -176,8 +170,7 @@ fn validate_vocabulary_children(vocabulary: &Path, diagnostics: &mut Vec<Diagnos
         }
 
         let name = entry.file_name().to_string_lossy().to_string();
-        if !matches!(name.as_str(), "kinds" | "relations" | "rules")
-            && !contains_arch_source(&entry.path())
+        if policy::vocabulary_child_policy(&name).is_none() && !contains_arch_source(&entry.path())
         {
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::Och007,
