@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -202,6 +203,32 @@ pub fn expected_stdout(fixture: &Path, kind: CommandKind) -> Result<String, Stri
 
 pub fn expected_stderr(fixture: &Path, kind: CommandKind) -> Result<String, String> {
     read_optional(fixture, kind.expected_stderr_path()).map(|content| content.unwrap_or_default())
+}
+
+pub fn command_args(
+    fixture: &Path,
+    kind: CommandKind,
+    repo: &Path,
+) -> Result<Vec<OsString>, String> {
+    let mut args = vec![OsString::from(kind.name()), repo.as_os_str().to_owned()];
+
+    match kind {
+        CommandKind::Check => {}
+        CommandKind::GraphJson => {
+            args.push(OsString::from("--format"));
+            args.push(OsString::from("json"));
+        }
+        CommandKind::Query => {
+            let symbol = read_required(
+                fixture,
+                kind.query_symbol_path()
+                    .expect("query command requires query symbol path"),
+            )?;
+            args.push(OsString::from(symbol.trim()));
+        }
+    }
+
+    Ok(args)
 }
 
 pub fn read_required(fixture: &Path, rel_path: &str) -> Result<String, String> {

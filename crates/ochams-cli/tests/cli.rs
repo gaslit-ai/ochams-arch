@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use ochams_fixtures::{
-    CommandKind, expected_stderr, expected_stdout, fixture_paths, read_expected_exit, read_required,
+    CommandKind, command_args, expected_stderr, expected_stdout, fixture_paths, read_expected_exit,
 };
 
 #[test]
@@ -61,26 +61,10 @@ fn assert_fixture_command(fixture: &Path, kind: CommandKind) {
     let expected_stdout = expected_stdout(fixture, kind).expect("expected stdout");
     let expected_stderr = expected_stderr(fixture, kind).expect("expected stderr");
 
-    let output = match kind {
-        CommandKind::Check => ochams().arg("check").arg(&repo).output().expect("check"),
-        CommandKind::GraphJson => ochams()
-            .arg("graph")
-            .arg(&repo)
-            .arg("--format")
-            .arg("json")
-            .output()
-            .expect("graph"),
-        CommandKind::Query => ochams()
-            .arg("query")
-            .arg(&repo)
-            .arg(
-                read_required(fixture, "query.symbol")
-                    .expect("query symbol")
-                    .trim(),
-            )
-            .output()
-            .expect("query"),
-    };
+    let output = ochams()
+        .args(command_args(fixture, kind, &repo).expect("command args"))
+        .output()
+        .expect("fixture command");
 
     assert_output(output, expected_exit, &expected_stdout, &expected_stderr);
 }

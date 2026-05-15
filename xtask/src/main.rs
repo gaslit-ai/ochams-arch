@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Output};
 
 use ochams_fixtures::{
-    CommandKind, display_fixture, expected_stderr, expected_stdout, fixture_paths,
-    read_expected_exit, read_required,
+    CommandKind, command_args, display_fixture, expected_stderr, expected_stdout, fixture_paths,
+    read_expected_exit,
 };
 use serde_json::Value;
 
@@ -108,22 +108,7 @@ impl From<Output> for CommandOutput {
 fn run_ochams(fixture: &Path, kind: CommandKind, ochams: &Path) -> Result<Output, String> {
     let repo = fixture.join("repo");
     let mut command = Command::new(ochams);
-    match kind {
-        CommandKind::Check => {
-            command.arg("check").arg(repo);
-        }
-        CommandKind::GraphJson => {
-            command.arg("graph").arg(repo).arg("--format").arg("json");
-        }
-        CommandKind::Query => {
-            let symbol = read_required(
-                fixture,
-                kind.query_symbol_path()
-                    .expect("query command requires query symbol"),
-            )?;
-            command.arg("query").arg(repo).arg(symbol.trim());
-        }
-    }
+    command.args(command_args(fixture, kind, &repo)?);
 
     command
         .output()
