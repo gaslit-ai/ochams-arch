@@ -116,7 +116,11 @@ fn run_ochams(fixture: &Path, kind: CommandKind, ochams: &Path) -> Result<Output
             command.arg("graph").arg(repo).arg("--format").arg("json");
         }
         CommandKind::Query => {
-            let symbol = read_required(fixture, "query.symbol")?;
+            let symbol = read_required(
+                fixture,
+                kind.query_symbol_path()
+                    .expect("query command requires query symbol"),
+            )?;
             command.arg("query").arg(repo).arg(symbol.trim());
         }
     }
@@ -180,22 +184,29 @@ fn regenerate_output(
 ) -> Result<(), String> {
     write_expected(
         fixture,
-        &format!("expected.{}.exit", kind.name()),
+        kind.expected_exit_path(),
         &format!("{}\n", output.exit_code),
     )?;
-    write_stream(fixture, kind, "stderr", &output.stderr)?;
+    write_stream(
+        fixture,
+        kind.expected_stderr_path(),
+        kind,
+        "stderr",
+        &output.stderr,
+    )?;
     write_stdout(fixture, kind, &output.stdout)?;
     Ok(())
 }
 
 fn write_stdout(fixture: &Path, kind: CommandKind, stdout: &[u8]) -> Result<(), String> {
-    remove_if_exists(fixture.join(format!("expected.{}.stdout", kind.name())))?;
-    remove_if_exists(fixture.join(format!("expected.{}.stdout.json", kind.name())))?;
+    for rel_path in kind.stdout_cleanup_paths() {
+        remove_if_exists(fixture.join(rel_path))?;
+    }
 
     if let Some(rel_path) = kind.expected_stdout_write_path(stdout) {
         write_expected(
             fixture,
-            &rel_path,
+            rel_path,
             bytes_as_utf8(fixture, kind, "stdout", stdout)?,
         )?;
     }
@@ -204,18 +215,18 @@ fn write_stdout(fixture: &Path, kind: CommandKind, stdout: &[u8]) -> Result<(), 
 
 fn write_stream(
     fixture: &Path,
+    rel_path: &str,
     kind: CommandKind,
-    stream: &str,
+    stream_name: &str,
     bytes: &[u8],
 ) -> Result<(), String> {
-    let rel_path = format!("expected.{}.{}", kind.name(), stream);
     if bytes.is_empty() {
         remove_if_exists(fixture.join(rel_path))?;
     } else {
         write_expected(
             fixture,
-            &rel_path,
-            bytes_as_utf8(fixture, kind, stream, bytes)?,
+            rel_path,
+            bytes_as_utf8(fixture, kind, stream_name, bytes)?,
         )?;
     }
     Ok(())

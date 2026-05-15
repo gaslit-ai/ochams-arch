@@ -10,55 +10,97 @@ pub enum CommandKind {
     Query,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct CommandSpec {
+    name: &'static str,
+    expected_exit_path: &'static str,
+    expected_stderr_path: &'static str,
+    allowed_stdout_path: &'static str,
+    stale_stdout_paths: &'static [&'static str],
+    stdout_cleanup_paths: &'static [&'static str],
+    query_symbol_path: Option<&'static str>,
+}
+
+const CHECK_STDOUT_PATHS: &[&str] = &["expected.check.stdout", "expected.check.stdout.json"];
+const GRAPH_STDOUT_PATHS: &[&str] = &["expected.graph.stdout", "expected.graph.stdout.json"];
+const QUERY_STDOUT_PATHS: &[&str] = &["expected.query.stdout", "expected.query.stdout.json"];
+
 impl CommandKind {
     pub const ALL: [Self; 3] = [Self::Check, Self::GraphJson, Self::Query];
 
-    pub fn name(self) -> &'static str {
+    fn spec(self) -> CommandSpec {
         match self {
-            Self::Check => "check",
-            Self::GraphJson => "graph",
-            Self::Query => "query",
+            Self::Check => CommandSpec {
+                name: "check",
+                expected_exit_path: "expected.check.exit",
+                expected_stderr_path: "expected.check.stderr",
+                allowed_stdout_path: "expected.check.stdout",
+                stale_stdout_paths: &["expected.check.stdout.json"],
+                stdout_cleanup_paths: CHECK_STDOUT_PATHS,
+                query_symbol_path: None,
+            },
+            Self::GraphJson => CommandSpec {
+                name: "graph",
+                expected_exit_path: "expected.graph.exit",
+                expected_stderr_path: "expected.graph.stderr",
+                allowed_stdout_path: "expected.graph.stdout.json",
+                stale_stdout_paths: &["expected.graph.stdout"],
+                stdout_cleanup_paths: GRAPH_STDOUT_PATHS,
+                query_symbol_path: None,
+            },
+            Self::Query => CommandSpec {
+                name: "query",
+                expected_exit_path: "expected.query.exit",
+                expected_stderr_path: "expected.query.stderr",
+                allowed_stdout_path: "expected.query.stdout",
+                stale_stdout_paths: &["expected.query.stdout.json"],
+                stdout_cleanup_paths: QUERY_STDOUT_PATHS,
+                query_symbol_path: Some("query.symbol"),
+            },
         }
+    }
+
+    pub fn name(self) -> &'static str {
+        self.spec().name
     }
 
     fn parse(value: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| kind.name() == value)
     }
 
-    pub fn expected_stdout_write_path(self, stdout: &[u8]) -> Option<String> {
+    pub fn expected_stdout_write_path(self, stdout: &[u8]) -> Option<&'static str> {
         if stdout.is_empty() {
             return None;
         }
 
-        match self {
-            Self::GraphJson => Some(format!("expected.{}.stdout.json", self.name())),
-            Self::Check | Self::Query => Some(format!("expected.{}.stdout", self.name())),
-        }
+        Some(self.allowed_stdout_path())
     }
 
-    pub fn stale_stdout_paths(self) -> Vec<String> {
-        match self {
-            Self::GraphJson => vec![format!("expected.{}.stdout", self.name())],
-            Self::Check | Self::Query => vec![format!("expected.{}.stdout.json", self.name())],
-        }
+    pub fn stale_stdout_paths(self) -> &'static [&'static str] {
+        self.spec().stale_stdout_paths
     }
 
-    fn expected_exit_path(self) -> String {
-        format!("expected.{}.exit", self.name())
+    pub fn stdout_cleanup_paths(self) -> &'static [&'static str] {
+        self.spec().stdout_cleanup_paths
     }
 
-    fn expected_stderr_path(self) -> String {
-        format!("expected.{}.stderr", self.name())
+    pub fn expected_exit_path(self) -> &'static str {
+        self.spec().expected_exit_path
     }
 
-    fn allowed_stdout_path(self) -> String {
-        match self {
-            Self::GraphJson => format!("expected.{}.stdout.json", self.name()),
-            Self::Check | Self::Query => format!("expected.{}.stdout", self.name()),
-        }
+    pub fn expected_stderr_path(self) -> &'static str {
+        self.spec().expected_stderr_path
     }
 
-    fn allowed_expected_paths(self) -> [String; 3] {
+    pub fn allowed_stdout_path(self) -> &'static str {
+        self.spec().allowed_stdout_path
+    }
+
+    pub fn query_symbol_path(self) -> Option<&'static str> {
+        self.spec().query_symbol_path
+    }
+
+    fn allowed_expected_paths(self) -> [&'static str; 3] {
         [
             self.expected_exit_path(),
             self.expected_stderr_path(),
@@ -133,7 +175,7 @@ pub fn read_commands(fixture: &Path) -> Result<Vec<CommandKind>, String> {
 }
 
 pub fn read_expected_exit(fixture: &Path, kind: CommandKind) -> Result<i32, String> {
-    read_required(fixture, &kind.expected_exit_path())?
+    read_required(fixture, kind.expected_exit_path())?
         .trim()
         .parse()
         .map_err(|error| {
@@ -147,7 +189,7 @@ pub fn read_expected_exit(fixture: &Path, kind: CommandKind) -> Result<i32, Stri
 
 pub fn expected_stdout(fixture: &Path, kind: CommandKind) -> Result<String, String> {
     for stale in kind.stale_stdout_paths() {
-        if fixture.join(&stale).exists() {
+        if fixture.join(stale).exists() {
             return Err(format!(
                 "{} has stale or misnamed stdout fixture {stale}",
                 display_fixture(fixture)
@@ -155,11 +197,11 @@ pub fn expected_stdout(fixture: &Path, kind: CommandKind) -> Result<String, Stri
         }
     }
 
-    read_optional(fixture, &kind.allowed_stdout_path()).map(|content| content.unwrap_or_default())
+    read_optional(fixture, kind.allowed_stdout_path()).map(|content| content.unwrap_or_default())
 }
 
 pub fn expected_stderr(fixture: &Path, kind: CommandKind) -> Result<String, String> {
-    read_optional(fixture, &kind.expected_stderr_path()).map(|content| content.unwrap_or_default())
+    read_optional(fixture, kind.expected_stderr_path()).map(|content| content.unwrap_or_default())
 }
 
 pub fn read_required(fixture: &Path, rel_path: &str) -> Result<String, String> {
@@ -195,11 +237,12 @@ fn read_text_file(
 
 fn validate_fixture_contract(fixture: &Path, commands: &[CommandKind]) -> Result<(), String> {
     let declared = commands.iter().copied().collect::<BTreeSet<_>>();
-    let has_query_symbol = fixture.join("query.symbol").exists();
-
+    let query_symbol_path = CommandKind::Query
+        .query_symbol_path()
+        .expect("query command path is defined");
     if declared.contains(&CommandKind::Query) {
-        read_required(fixture, "query.symbol")?;
-    } else if has_query_symbol {
+        read_required(fixture, query_symbol_path)?;
+    } else if fixture.join(query_symbol_path).exists() {
         return Err(format!(
             "{} has query.symbol but commands.txt does not declare `query`",
             display_fixture(fixture)
@@ -499,11 +542,11 @@ mod tests {
     fn regeneration_paths_remove_empty_stdout_authority() {
         assert_eq!(
             CommandKind::GraphJson.expected_stdout_write_path(b"{}"),
-            Some("expected.graph.stdout.json".to_owned())
+            Some("expected.graph.stdout.json")
         );
         assert_eq!(
             CommandKind::Query.expected_stdout_write_path(b"symbol: x\n"),
-            Some("expected.query.stdout".to_owned())
+            Some("expected.query.stdout")
         );
         assert_eq!(CommandKind::Check.expected_stdout_write_path(b""), None);
     }
