@@ -1,0 +1,6 @@
+space VetClinic
+module Vocabulary.Relations
+
+use VetClinic.Vocabulary.Kinds.Entity
+
+relation has Entity -> Entity
