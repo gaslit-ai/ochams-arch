@@ -2,10 +2,10 @@ use std::fmt;
 
 use serde::Serialize;
 
-/// Half-open UTF-8 byte range inside one architecture source file.
+/// Half-open UTF-8 byte range inside one source text projection.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct SourceSpan {
-    /// Source path relative to the repository root.
+    /// Source path relative to the projection's source root.
     pub path: String,
     /// Inclusive byte offset where the span begins.
     pub start: usize,

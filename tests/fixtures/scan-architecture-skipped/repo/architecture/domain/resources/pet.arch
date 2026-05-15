@@ -1,0 +1,7 @@
+space VetClinic
+module Domain.Resources
+
+use VetClinic.Vocabulary.Kinds.Entity
+
+# @realizes VetClinic.Domain.Resources.Pet
+node Pet : Entity

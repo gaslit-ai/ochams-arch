@@ -1,0 +1,33 @@
+{
+  "format": "ochams.scan.v1",
+  "architectureSpace": "VetClinic",
+  "codeRoot": "src",
+  "sourceAnchors": [
+    {
+      "kind": "realizes",
+      "symbol": "VetClinic.Capabilities.Commands.ScheduleAppointment",
+      "span": {
+        "path": "scheduling.rs",
+        "start": 27,
+        "end": 88
+      },
+      "extractor": "text-anchor",
+      "confidence": 1.0
+    }
+  ],
+  "observedEdges": [
+    {
+      "source": "VetClinic.Capabilities.Commands.ScheduleAppointment",
+      "relation": "VetClinic.Vocabulary.Relations.reads",
+      "target": "VetClinic.Domain.Resources.Pet",
+      "declared": true,
+      "span": {
+        "path": "scheduling.rs",
+        "start": 96,
+        "end": 221
+      },
+      "extractor": "text-anchor",
+      "confidence": 1.0
+    }
+  ]
+}

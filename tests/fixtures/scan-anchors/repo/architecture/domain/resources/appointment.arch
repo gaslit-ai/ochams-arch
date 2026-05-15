@@ -1,0 +1,10 @@
+space VetClinic
+module Domain.Resources
+
+use VetClinic.Vocabulary.Kinds.Entity
+use VetClinic.Vocabulary.Relations.has
+use VetClinic.Domain.Resources.Pet
+
+node Appointment : Entity
+
+edge Pet has Appointment

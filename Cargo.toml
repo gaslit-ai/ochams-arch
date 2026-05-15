@@ -2,6 +2,7 @@
 members = [
   "crates/ochams-cli",
   "crates/ochams-core",
+  "crates/ochams-scan",
 ]
 resolver = "3"
 

@@ -30,6 +30,8 @@ canonical architecture tree
 
 The later Evidence MVP compares the declared graph with realization claims and observed evidence. It is deliberately separated from the first compiler milestone so the architecture language can become precise before implementation scanning exists.
 
+The current Evidence walking skeleton is intentionally narrower than the full Evidence MVP. It validates language-agnostic text anchors against the checked declared graph and emits deterministic scan JSON. It does not yet compare whole evidence sets, import external analyzer output, or make evidence authoritative.
+
 No generated implementation code is required. The strongest form of the tool is not code generation; it is making architectural relationships explicit, typed, navigable, consistently placed, and difficult to drift from unnoticed.
 
 ## Table Of Contents
@@ -1249,11 +1251,20 @@ Neither `realization/` nor `evidence/` may declare domain, capability, boundary,
 Future commands:
 
 ```text
-ochams scan <root> --code <path>
+ochams scan <root> --code <path> --format json
 ochams diff <root> --code <path>
 ```
 
-These commands are not part of the Compiler MVP.
+`scan` is the first Evidence walking-skeleton command. `diff` is not part of the current implementation.
+
+Command contract:
+
+```text
+success: exit 0, deterministic scan JSON on stdout, diagnostics absent from stdout
+failure: nonzero exit, diagnostics on stderr, no JSON on stdout
+format: UTF-8, LF, two-space pretty JSON, trailing newline
+invalid format or malformed invocation: nonzero exit, OCH020 diagnostic on stderr
+```
 
 ### Source Anchors
 
@@ -1261,21 +1272,28 @@ Example anchor text:
 
 ```text
 @realizes VetClinic.Capabilities.Commands.ScheduleAppointment
-@edge VetClinic.Capabilities.Commands.ScheduleAppointment reads VetClinic.Domain.Resources.Pet
-@edge VetClinic.Capabilities.Commands.ScheduleAppointment writes VetClinic.Domain.Resources.Appointment
+@edge VetClinic.Capabilities.Commands.ScheduleAppointment VetClinic.Vocabulary.Relations.reads VetClinic.Domain.Resources.Pet
+@edge VetClinic.Capabilities.Commands.ScheduleAppointment VetClinic.Vocabulary.Relations.writes VetClinic.Domain.Resources.Appointment
 ```
 
 The scanner must not care whether this appears in a comment, docstring, Markdown file, or another text format. Byte-level anchor extraction belongs to the Evidence MVP.
+
+The walking skeleton recognizes anchors by scanning UTF-8 text lines for:
+
+```text
+@realizes <fully-qualified-symbol>
+@edge <fully-qualified-source-node> <fully-qualified-relation> <fully-qualified-target-node>
+```
+
+`@realizes` may reference any declared graph symbol. `@edge` requires source and target references to be declared nodes, the relation reference to be a declared relation, and the source and target node kinds to satisfy the relation's declared endpoint kinds. Extra text after the required anchor tokens is ignored so comments can carry human notes. Malformed anchors and anchors that reference unknown, wrong-category, or endpoint-incompatible symbols produce scanner diagnostics and prevent scan JSON emission.
 
 ### Evidence Model
 
 ```text
 SourceAnchor
-  symbol
-  relation
-  target
-  file
   span
+  kind
+  symbol
   extractor
   confidence
 
@@ -1283,12 +1301,79 @@ ObservedEdge
   source
   relation
   target
-  provenance
+  declared
+  span
+  extractor
   confidence
-  supporting_anchors
 ```
 
 Evidence can support the declared graph, contradict it, or reveal unexplained implementation behavior. It cannot change the declared graph.
+
+This is the walking-skeleton scan projection model, not the final persisted evidence graph. Later imported analyzer evidence may add provenance records, supporting-anchor groups, extractor-specific payloads, or normalized observed-edge IDs when those are needed by `diff`.
+
+### Scan JSON Projection
+
+`ochams scan <root> --code <path> --format json` emits a deterministic projection of extracted text-anchor evidence:
+
+```json
+{
+  "format": "ochams.scan.v1",
+  "architectureSpace": "VetClinic",
+  "codeRoot": "src",
+  "sourceAnchors": [],
+  "observedEdges": []
+}
+```
+
+`sourceAnchors[]` records validated `@realizes` anchors:
+
+```json
+{
+  "kind": "realizes",
+  "symbol": "VetClinic.Capabilities.Commands.ScheduleAppointment",
+  "span": {
+    "path": "scheduling.rs",
+    "start": 27,
+    "end": 88
+  },
+  "extractor": "text-anchor",
+  "confidence": 1.0
+}
+```
+
+`observedEdges[]` records validated `@edge` anchors:
+
+```json
+{
+  "source": "VetClinic.Capabilities.Commands.ScheduleAppointment",
+  "relation": "VetClinic.Vocabulary.Relations.reads",
+  "target": "VetClinic.Domain.Resources.Pet",
+  "declared": true,
+  "span": {
+    "path": "scheduling.rs",
+    "start": 96,
+    "end": 221
+  },
+  "extractor": "text-anchor",
+  "confidence": 1.0
+}
+```
+
+`declared` is true when the checked declared graph already contains the same source, relation, and target edge fact. False means the implementation-adjacent anchor describes behavior that is not currently declared. It is evidence, not a mutation to the architecture graph.
+
+Relative `--code` arguments are resolved against `<root>`, not the caller's current directory. Absolute `--code` arguments are allowed; if they are under `<root>`, `codeRoot` is rendered root-relative in scan JSON. Scan file paths are relative to the supplied code root. Traversal and exclusion checks use canonicalized paths, while `codeRoot` preserves the user-facing argument shape. The CLI passes the authoritative `<root>/architecture` subtree as an excluded source root; scanning `<root>`, `<root>/architecture`, or a descendant of `<root>/architecture` cannot convert architecture source into evidence. Other implementation directories named `architecture` are not excluded by name alone. VCS metadata roots and VCS/search control files such as `.git/`, `.hg/`, `.svn/`, `.jj/`, `.gitignore`, `.gitattributes`, `.gitmodules`, `.git-blame-ignore-revs`, `.hgignore`, `.ignore`, `.rgignore`, and `.fdignore` are excluded from evidence traversal, including when an absolute `--code` path points outside `<root>`, while other hidden implementation paths remain eligible. Non-UTF-8 files are ignored by the text-anchor extractor.
+
+Scan JSON output rules:
+
+```text
+UTF-8
+LF newlines
+two-space indentation
+trailing newline
+sourceAnchors sorted by path, span, and symbol
+observedEdges sorted by path, span, source, relation, and target
+no scan JSON emitted when declared graph compilation or scanner validation fails
+```
 
 ### Evidence Region
 
@@ -1339,6 +1424,15 @@ OCH021 symbol category mismatch
 OCH022 malformed path segment
 OCH023 unknown kind class
 OCH024 unknown relation class
+```
+
+The scanner uses a separate diagnostic namespace because scanned implementation-adjacent text is evidence input, not architecture source:
+
+```text
+SCN001 code root traversal or file reading failed
+SCN002 malformed text anchor
+SCN003 anchor references a symbol absent from the declared graph
+SCN004 anchor references a declared symbol with the wrong graph category, or an observed edge does not satisfy the relation's endpoint kinds
 ```
 
 The compiler core owns diagnostic data and deterministic plain-text diagnostic rendering. The CLI owns command routing, exit codes, stream selection, and terminal policy such as color. Some repository-level diagnostics, such as a missing `architecture/workspace.arch`, may not have a source span.
@@ -1450,10 +1544,16 @@ tests/fixtures/<case>/
 ├── query.symbol
 ├── expected.query.exit
 ├── expected.query.stdout
-└── expected.query.stderr
+├── expected.query.stderr
+├── scan.code
+├── expected.scan.exit
+├── expected.scan.stdout.json
+└── expected.scan.stderr
 ```
 
 `expected.<command>.exit` marks a command as part of the fixture. The fixture harness discovers every fixture directory and runs every command with an `expected.<command>.exit` file. Missing stdout or stderr files for an exercised command mean the stream is expected to be empty. Existing expected stream files must be readable UTF-8; unreadable or malformed files are fixture errors, not empty streams. `query.symbol` supplies the fully qualified query argument for `expected.query.*` files.
+
+`scan.code` supplies the code-root argument, interpreted relative to the fixture repository root. `expected.scan.*` files pin the Evidence walking-skeleton command contract.
 
 Invalid-repository fixtures should pin failure behavior for every public command they can exercise. At minimum, one invalid fixture must assert that `check`, `graph --format json`, and `query` fail without stdout leakage and with deterministic diagnostic stderr.
 
@@ -1485,6 +1585,7 @@ The first implementation should become a Rust workspace after the root scaffold 
 crates/
   ochams-core/
   ochams-cli/
+  ochams-scan/
 ```
 
 ### `ochams-core`
@@ -1533,13 +1634,17 @@ Evidence data structures may be introduced after the Compiler MVP, but they are 
 
 ### `ochams-cli`
 
-Owns command parsing, exit codes, stream selection, and terminal policy. It delegates deterministic diagnostic, graph JSON, and query text rendering to `ochams-core`.
+Owns command parsing, exit codes, stream selection, and terminal policy. It delegates deterministic diagnostic, graph JSON, and query text rendering to `ochams-core`, and deterministic scan JSON plus scanner diagnostics to `ochams-scan`.
+
+### `ochams-scan`
+
+Owns implementation-adjacent evidence traversal and text-anchor extraction. It consumes the public `GraphProjection` from `ochams-core`, validates `@realizes` and `@edge` anchors against declared graph symbols, and emits a deterministic scan projection. It must not declare architecture facts, mutate the checked graph, inspect raw compiler records, or contain implementation-language-specific parsing rules.
+
+`ochams-scan` uses code-root-local `.gitignore`, `.ignore`, `.rgignore`, and `.fdignore` behavior for code traversal but disables user-global ignore files and parent-directory ignore discovery so scan output is controlled by the selected code root rather than the machine running the command. Repository-root ignore inheritance for subdirectory scans is deferred until a project-level scanner configuration exists.
 
 ### Deferred Crates
 
 `ochams-lsp` is deferred until `ochams-core` has stable symbol, diagnostic, source-span, and query contracts. It will own editor protocol translation and convert core data into completions, go-to-definition, diagnostics, document symbols, and workspace symbols. It must not contain compiler rules.
-
-`ochams-scan` is deferred until the Evidence MVP. It will own source traversal and evidence extraction, normalizing anchors and external analyzer output into `SourceAnchor` and `ObservedEdge`. It must not define architecture.
 
 ## Crate Strategy
 
@@ -1551,9 +1656,10 @@ Rust is the implementation language. It is not part of the architecture language
 serde                 serialization
 serde_json            graph JSON
 winnow                line-oriented statement parser
+ignore                implementation-adjacent evidence traversal
 ```
 
-The executable slice intentionally uses Rust's standard library for traversal, diagnostics, CLI argument handling, stable maps, and graph indexes. Parsing uses `winnow` only at the statement-line boundary. This is not a rejection of compiler tooling; it is the weakest useful implementation for the current line-oriented grammar.
+The compiler slice intentionally uses Rust's standard library for architecture source traversal, diagnostics, CLI argument handling, stable maps, and graph indexes. Parsing uses `winnow` only at the statement-line boundary. Evidence scanning uses `ignore` because implementation-adjacent code traversal should respect project ignore files while avoiding user-global ignore drift. This is not a rejection of compiler tooling; it is the weakest useful implementation for the current line-oriented grammar and evidence-anchor scanner.
 
 Package manifests carry only durable crate metadata: edition, version, license, repository, rust-version, and a concise description. Manifest metadata must describe what each crate is now, not future export targets or imagined integrations. The workspace currently enforces Rust 2024 with a minimum compiler version compatible with that edition.
 
@@ -1574,7 +1680,6 @@ salsa                 incremental compiler queries when watch/LSP latency matter
 clap                  CLI once command shape grows beyond three stable commands
 toml                  optional project config
 camino                UTF-8 paths
-ignore                deterministic repository traversal
 globset               path filtering
 thiserror             typed library errors
 anyhow                binary boundary errors

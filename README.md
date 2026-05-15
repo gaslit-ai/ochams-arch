@@ -10,6 +10,12 @@ ochams graph <root> --format json
 ochams query <root> <symbol>
 ```
 
+The first Evidence walking skeleton adds a text-anchor scan projection:
+
+```text
+ochams scan <root> --code <path> --format json
+```
+
 The source tree is the authoritative store. Generated JSON, query text, diagrams, documents, and context packs are projections.
 
 ## Model
@@ -65,6 +71,8 @@ The public graph surface is projection-oriented. `Graph::projection()` returns `
 `ochams-core` denies undocumented public items. Rustdoc therefore describes the exported compiler contract, while generated documentation remains a disposable projection of the source.
 
 The snippet above shows the primary flow. Supporting exported types such as diagnostics, source spans, compilation results, and graph projection records are part of the Rustdoc contract too.
+
+`ochams-scan` consumes `GraphProjection` and implementation-adjacent text. It recognizes `@realizes` and `@edge` anchors, validates them against the declared graph, and emits deterministic scan JSON. Evidence is never architecture authority.
 
 ## Verification
 
