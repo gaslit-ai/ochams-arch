@@ -2,6 +2,8 @@
 
 ### Better architecture patterns must be evaluated and implemented after every implementation
 
+### No magic strings anywhere
+
 ### Breaking changes are encouraged 
 - There are no consumers
 - Code must be thin
