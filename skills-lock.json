@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "refactoring-playbook": {
+      "source": "gaslit-ai/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/refactoring-playbook/SKILL.md",
+      "computedHash": "e9059871977f7f0d29e3721d0b48e575b221b9ee9fcd4fa92fa1a7d4405985bd"
+    },
+    "shared-ontologies": {
+      "source": "gaslit-ai/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/shared-ontologies/SKILL.md",
+      "computedHash": "159c7a075f215c1e55b76a542096c69f45b29fc0eae0943ce741a8c52731cfee"
+    }
+  }
+}
