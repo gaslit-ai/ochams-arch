@@ -1,0 +1,10 @@
+space VetClinic
+module Capabilities.Commands
+
+use VetClinic.Vocabulary.Kinds.Operation
+use VetClinic.Vocabulary.Relations.reads
+use VetClinic.Domain.Resources.Pet
+
+node ScheduleAppointment : Operation
+
+edge ScheduleAppointment reads Pet

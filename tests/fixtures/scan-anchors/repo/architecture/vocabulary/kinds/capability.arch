@@ -1,0 +1,4 @@
+space VetClinic
+module Vocabulary.Kinds
+
+kind Operation

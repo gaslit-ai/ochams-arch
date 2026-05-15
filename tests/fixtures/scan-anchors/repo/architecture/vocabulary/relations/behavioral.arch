@@ -1,0 +1,7 @@
+space VetClinic
+module Vocabulary.Relations
+
+use VetClinic.Vocabulary.Kinds.Operation
+use VetClinic.Vocabulary.Kinds.Entity
+
+relation reads Operation -> Entity

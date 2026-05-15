@@ -197,3 +197,27 @@ This todo list tracks the MVP hardening loop across specification, implementatio
 - [x] Update the spec to record the parsed-source versus checked-source prior.
 - [x] Run full verification, including rustdoc.
 - [x] Spawn devil's-advocate review agents to challenge source-unit invariant closure and behavioral preservation.
+
+## Phase 16: Evidence Anchor Walking Skeleton
+
+- [x] Research current Rust traversal and CLI dependency pressure before opening the Evidence MVP.
+- [x] Adopt `ignore` for implementation-adjacent evidence traversal while keeping architecture source traversal in `ochams-core` deterministic and std-only.
+- [x] Add an `ochams-scan` crate that validates text anchors against the public graph projection without defining architecture authority.
+- [x] Implement `@realizes` source anchors and `@edge` observed-edge anchors as the first language-agnostic evidence slice.
+- [x] Add `ochams scan <root> --code <path> --format json` with deterministic JSON and scanner diagnostics.
+- [x] Extend golden command fixtures with scan metadata and a real code-anchor fixture.
+- [x] Update the spec to record the Evidence walking-skeleton command, projection, diagnostics, crate topology, and dependency prior.
+- [x] Run verification for the new walking skeleton.
+- [x] Spawn devil's-advocate review agents to challenge scanner boundaries, evidence semantics, dependency choice, and spec alignment.
+
+## Phase 17: Evidence Review Repair
+
+- [x] Resolve relative `--code` paths against `<root>` instead of the caller's current directory.
+- [x] Preserve deterministic `codeRoot` projection text after resolving traversal paths.
+- [x] Exclude direct and nested `architecture` path components from evidence traversal.
+- [x] Validate `@edge` endpoint kinds against the declared relation endpoint kinds.
+- [x] Broaden `SourceSpan` documentation so scanner spans do not contradict the public API contract.
+- [x] Pin scanner diagnostics, endpoint validation, extra-token behavior, undeclared well-typed edges, and architecture exclusion with tests or fixtures.
+- [x] Update the spec to align examples, path semantics, architecture skipping, and endpoint validation with implementation.
+- [x] Run verification after review repairs.
+- [x] Spawn devil's-advocate review agents to challenge the repaired Evidence walking skeleton.
