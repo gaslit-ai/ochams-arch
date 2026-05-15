@@ -1,0 +1,6 @@
+space VetClinic
+module Domain.Resources
+
+use VetClinic.Vocabulary.Kinds.Entity
+
+node Pet : Entity

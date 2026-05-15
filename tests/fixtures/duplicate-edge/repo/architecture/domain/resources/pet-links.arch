@@ -1,0 +1,8 @@
+space VetClinic
+module Domain.Resources
+
+use VetClinic.Domain.Resources.Pet
+use VetClinic.Vocabulary.Relations.has
+use VetClinic.Domain.Resources.Appointment
+
+edge Pet has Appointment

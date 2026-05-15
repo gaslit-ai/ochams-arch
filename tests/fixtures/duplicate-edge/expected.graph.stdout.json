@@ -1,0 +1,105 @@
+{
+  "format": "ochams.graph.v1",
+  "space": "VetClinic",
+  "workspaceSource": {
+    "path": "architecture/workspace.arch"
+  },
+  "sources": [
+    {
+      "path": "architecture/domain/resources/appointment.arch",
+      "region": "domain/resources",
+      "module": "VetClinic.Domain.Resources"
+    },
+    {
+      "path": "architecture/domain/resources/pet-links.arch",
+      "region": "domain/resources",
+      "module": "VetClinic.Domain.Resources"
+    },
+    {
+      "path": "architecture/domain/resources/pet.arch",
+      "region": "domain/resources",
+      "module": "VetClinic.Domain.Resources"
+    },
+    {
+      "path": "architecture/vocabulary/kinds/domain.arch",
+      "region": "vocabulary/kinds",
+      "module": "VetClinic.Vocabulary.Kinds"
+    },
+    {
+      "path": "architecture/vocabulary/relations/structural.arch",
+      "region": "vocabulary/relations",
+      "module": "VetClinic.Vocabulary.Relations"
+    }
+  ],
+  "kinds": [
+    {
+      "symbol": "VetClinic.Vocabulary.Kinds.Entity",
+      "name": "Entity",
+      "class": "domain",
+      "declaredAt": {
+        "path": "architecture/vocabulary/kinds/domain.arch",
+        "start": 41,
+        "end": 52
+      }
+    }
+  ],
+  "relations": [
+    {
+      "symbol": "VetClinic.Vocabulary.Relations.has",
+      "name": "has",
+      "class": "structural",
+      "sourceKind": "VetClinic.Vocabulary.Kinds.Entity",
+      "targetKind": "VetClinic.Vocabulary.Kinds.Entity",
+      "declaredAt": {
+        "path": "architecture/vocabulary/relations/structural.arch",
+        "start": 84,
+        "end": 113
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "symbol": "VetClinic.Domain.Resources.Appointment",
+      "name": "Appointment",
+      "kind": "VetClinic.Vocabulary.Kinds.Entity",
+      "kindClass": "domain",
+      "declaredAt": {
+        "path": "architecture/domain/resources/appointment.arch",
+        "start": 154,
+        "end": 179
+      }
+    },
+    {
+      "symbol": "VetClinic.Domain.Resources.Pet",
+      "name": "Pet",
+      "kind": "VetClinic.Vocabulary.Kinds.Entity",
+      "kindClass": "domain",
+      "declaredAt": {
+        "path": "architecture/domain/resources/pet.arch",
+        "start": 80,
+        "end": 97
+      }
+    }
+  ],
+  "edges": [
+    {
+      "key": "VetClinic.Domain.Resources.Pet|VetClinic.Vocabulary.Relations.has|VetClinic.Domain.Resources.Appointment",
+      "source": "VetClinic.Domain.Resources.Pet",
+      "relation": "VetClinic.Vocabulary.Relations.has",
+      "relationClass": "structural",
+      "target": "VetClinic.Domain.Resources.Appointment",
+      "declaredAt": [
+        {
+          "path": "architecture/domain/resources/appointment.arch",
+          "start": 180,
+          "end": 204
+        },
+        {
+          "path": "architecture/domain/resources/pet-links.arch",
+          "start": 159,
+          "end": 183
+        }
+      ]
+    }
+  ]
+}

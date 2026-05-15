@@ -1,0 +1,10 @@
+symbol: VetClinic.Domain.Resources.Pet
+category: node
+kind: VetClinic.Vocabulary.Kinds.Entity
+layout-region: domain/resources
+declared-at: architecture/domain/resources/pet.arch:80..97
+incoming:
+outgoing:
+  VetClinic.Domain.Resources.Pet --VetClinic.Vocabulary.Relations.has--> VetClinic.Domain.Resources.Appointment
+dependents:
+  VetClinic.Domain.Resources.Appointment
