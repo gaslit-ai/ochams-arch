@@ -256,3 +256,13 @@ This todo list tracks the MVP hardening loop across specification, implementatio
 - [x] Fix review finding by separating semantic seed repos from public golden command fixtures.
 - [x] Fix review finding by tightening seeded negative tests from “contains code” to exact diagnostic-code sets where the scenario is single-failure by construction.
 - [x] Fix review finding by reusing the checked-in `missing-space` seed and documenting the broader checked-in fixture corpus.
+
+## Phase 21: Repository Support Seam
+
+- [x] Research whole-workspace library patterns with emphasis on trait seams, shared integration points, RAII resource management, and stable internal support crates.
+- [x] Identify repository-topology knowledge and repo-shaped temp-directory lifecycle code that still lived outside the internal support crate.
+- [x] Move workspace-root discovery, seed-root discovery, seed materialization, and directory-copy support behind `ochams-fixtures`.
+- [x] Replace ad hoc repo-shaped temp directories in core semantic tests with RAII-backed support-crate repos.
+- [x] Keep fixture file semantics and command argv semantics centralized in the same internal support crate boundary.
+- [x] Update the spec so `ochams-fixtures` reflects its broader repository-support role.
+- [x] Run full verification, including fixture verification and rustdoc.

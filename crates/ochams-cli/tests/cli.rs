@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use ochams_fixtures::{
-    CommandKind, command_args, expected_stderr, expected_stdout, fixture_paths, read_expected_exit,
+    CommandKind, command_args, expected_stderr, expected_stdout, find_workspace_root,
+    fixture_paths, read_expected_exit,
 };
 
 #[test]
@@ -86,8 +87,5 @@ fn ochams() -> Command {
 }
 
 fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("workspace root")
+    find_workspace_root(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("workspace root")
 }

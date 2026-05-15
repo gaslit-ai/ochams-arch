@@ -1,11 +1,11 @@
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::Path;
 
 use ochams_core::{
     Diagnostic, DiagnosticCode, GraphEdge, GraphKind, GraphNode, GraphProjection, GraphRelation,
     GraphSource, GraphWorkspaceSource, SourceSpan, compile, format_diagnostics, format_query,
 };
+use ochams_fixtures::{RepoDir, find_workspace_root, materialize_seed, temp_repo};
 
 #[test]
 fn valid_minimal_graph_and_query() {
@@ -201,7 +201,11 @@ fn architecture_symlink_root_is_not_followed() {
 
     let root = fixture("architecture_symlink_root_is_not_followed");
     let target = seeded_fixture("architecture_symlink_root_target", "valid-minimal");
-    symlink(target.join("architecture"), root.join("architecture")).expect("symlink");
+    symlink(
+        target.path().join("architecture"),
+        root.path().join("architecture"),
+    )
+    .expect("symlink");
 
     assert_codes(&root, &[DiagnosticCode::Och002]);
 }
@@ -255,7 +259,7 @@ fn module_path_mismatch_is_reported() {
 fn unknown_layout_region_is_reported_even_when_empty() {
     let root = fixture("unknown_layout_region_is_reported_even_when_empty");
     write(&root, "architecture/workspace.arch", "space VetClinic\n");
-    fs::create_dir_all(root.join("architecture/not-a-region")).expect("mkdir");
+    fs::create_dir_all(root.path().join("architecture/not-a-region")).expect("mkdir");
 
     assert_has_code(&root, DiagnosticCode::Och007);
 }
@@ -291,7 +295,7 @@ fn unknown_vocabulary_source_is_classified_once() {
 fn unknown_vocabulary_position_is_reported_even_when_empty() {
     let root = fixture("unknown_vocabulary_position_is_reported_even_when_empty");
     write(&root, "architecture/workspace.arch", "space VetClinic\n");
-    fs::create_dir_all(root.join("architecture/vocabulary/not-a-position")).expect("mkdir");
+    fs::create_dir_all(root.path().join("architecture/vocabulary/not-a-position")).expect("mkdir");
 
     assert_has_code(&root, DiagnosticCode::Och007);
 }
@@ -684,7 +688,7 @@ fn invalid_region_reference_is_reported() {
     );
 }
 
-fn assert_codes(root: &Path, expected: &[DiagnosticCode]) {
+fn assert_codes(root: impl AsRef<Path>, expected: &[DiagnosticCode]) {
     let diagnostics = compile(root).diagnostics;
     assert_eq!(
         diagnostics
@@ -696,7 +700,7 @@ fn assert_codes(root: &Path, expected: &[DiagnosticCode]) {
     );
 }
 
-fn assert_has_code(root: &Path, code: DiagnosticCode) {
+fn assert_has_code(root: impl AsRef<Path>, code: DiagnosticCode) {
     let diagnostics = compile(root).diagnostics;
     assert!(
         diagnostics.iter().any(|diagnostic| diagnostic.code == code),
@@ -704,7 +708,7 @@ fn assert_has_code(root: &Path, code: DiagnosticCode) {
     );
 }
 
-fn assert_diagnostics(root: &Path, expected: &[Diagnostic]) {
+fn assert_diagnostics(root: impl AsRef<Path>, expected: &[Diagnostic]) {
     let diagnostics = compile(root).diagnostics;
     assert_eq!(
         format_diagnostics(&diagnostics),
@@ -713,7 +717,7 @@ fn assert_diagnostics(root: &Path, expected: &[Diagnostic]) {
     );
 }
 
-fn assert_code_count(root: &Path, code: DiagnosticCode, expected: usize) {
+fn assert_code_count(root: impl AsRef<Path>, code: DiagnosticCode, expected: usize) {
     let diagnostics = compile(root).diagnostics;
     let actual = diagnostics
         .iter()
@@ -730,66 +734,33 @@ fn codes(compilation: &ochams_core::Compilation) -> Vec<DiagnosticCode> {
         .collect()
 }
 
-fn fixture(name: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("ochams-{name}-{nonce}"));
-    fs::create_dir_all(&root).expect("fixture root");
-    root
+fn fixture(name: &str) -> RepoDir {
+    temp_repo(name).expect("temp repo")
 }
 
-fn seeded_fixture(name: &str, case: &str) -> PathBuf {
-    let root = fixture(name);
-    copy_dir_all(&fixture_repo(case), &root);
-    root
+fn seeded_fixture(name: &str, case: &str) -> RepoDir {
+    materialize_seed(&workspace_root(), case, name).expect("seed repo")
 }
 
-fn fixture_repo(case: &str) -> PathBuf {
-    workspace_root().join("tests").join("seeds").join(case)
+fn workspace_root() -> std::path::PathBuf {
+    find_workspace_root(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("workspace root")
 }
 
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find(|path| path.join("tests").join("seeds").is_dir() && path.join("xtask").is_dir())
-        .expect("workspace root")
-        .to_path_buf()
-}
-
-fn copy_dir_all(source: &Path, destination: &Path) {
-    let entries = fs::read_dir(source).expect("read source directory");
-    fs::create_dir_all(destination).expect("mkdir");
-
-    for entry in entries {
-        let entry = entry.expect("dir entry");
-        let source_path = entry.path();
-        let destination_path = destination.join(entry.file_name());
-
-        if entry.file_type().expect("entry type").is_dir() {
-            copy_dir_all(&source_path, &destination_path);
-        } else {
-            fs::copy(&source_path, &destination_path).expect("copy file");
-        }
-    }
-}
-
-fn write(root: &Path, rel_path: &str, content: &str) {
-    let path = root.join(rel_path);
+fn write(root: impl AsRef<Path>, rel_path: &str, content: &str) {
+    let path = root.as_ref().join(rel_path);
     fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
     fs::write(path, content).expect("write");
 }
 
-fn append(root: &Path, rel_path: &str, content: &str) {
-    let path = root.join(rel_path);
+fn append(root: impl AsRef<Path>, rel_path: &str, content: &str) {
+    let path = root.as_ref().join(rel_path);
     let mut current = fs::read_to_string(&path).expect("read append target");
     current.push_str(content);
     fs::write(path, current).expect("append");
 }
 
-fn span_for(root: &Path, rel_path: &str, statement: &str) -> SourceSpan {
-    let source = fs::read_to_string(root.join(rel_path)).expect("source");
+fn span_for(root: impl AsRef<Path>, rel_path: &str, statement: &str) -> SourceSpan {
+    let source = fs::read_to_string(root.as_ref().join(rel_path)).expect("source");
     let matches = source.match_indices(statement).collect::<Vec<_>>();
     assert_eq!(matches.len(), 1, "expected one `{statement}` in {rel_path}");
     let (start, text) = matches[0];

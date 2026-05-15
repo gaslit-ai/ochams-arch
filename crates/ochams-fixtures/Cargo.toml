@@ -6,7 +6,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
-description = "Shared golden fixture contract helpers for the Ochams workspace"
+description = "Shared repository fixture and seed support for the Ochams workspace"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+tempfile = "3"

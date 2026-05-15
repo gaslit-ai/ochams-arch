@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Output};
 
 use ochams_fixtures::{
-    CommandKind, command_args, display_fixture, expected_stderr, expected_stdout, fixture_paths,
-    read_expected_exit,
+    CommandKind, command_args, display_fixture, expected_stderr, expected_stdout,
+    find_workspace_root, fixture_paths, read_expected_exit,
 };
 use serde_json::Value;
 
@@ -326,10 +326,7 @@ fn find_ochams_executable(workspace: &Path, stdout: &str) -> Result<PathBuf, Str
 }
 
 fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask is inside the workspace root")
-        .to_path_buf()
+    find_workspace_root(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("workspace root")
 }
 
 #[cfg(test)]

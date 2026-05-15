@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use tempfile::{Builder, TempDir};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CommandKind {
@@ -116,8 +117,64 @@ pub struct Fixture {
     pub commands: Vec<CommandKind>,
 }
 
+#[derive(Debug)]
+pub struct RepoDir {
+    temp_dir: TempDir,
+}
+
+impl RepoDir {
+    pub fn path(&self) -> &Path {
+        self.temp_dir.path()
+    }
+}
+
+impl AsRef<Path> for RepoDir {
+    fn as_ref(&self) -> &Path {
+        self.path()
+    }
+}
+
+pub fn find_workspace_root(start: &Path) -> Result<PathBuf, String> {
+    start
+        .ancestors()
+        .find(|path| {
+            path.join("xtask").is_dir()
+                && fixture_root(path).is_dir()
+                && seed_root(path).is_dir()
+                && path.join("Cargo.toml").is_file()
+        })
+        .map(Path::to_path_buf)
+        .ok_or_else(|| format!("could not find workspace root from {}", start.display()))
+}
+
+pub fn fixture_root(workspace: &Path) -> PathBuf {
+    workspace.join("tests").join("fixtures")
+}
+
+pub fn seed_root(workspace: &Path) -> PathBuf {
+    workspace.join("tests").join("seeds")
+}
+
+pub fn seed_case_path(workspace: &Path, case: &str) -> PathBuf {
+    seed_root(workspace).join(case)
+}
+
+pub fn temp_repo(prefix: &str) -> Result<RepoDir, String> {
+    Builder::new()
+        .prefix(prefix)
+        .tempdir()
+        .map(|temp_dir| RepoDir { temp_dir })
+        .map_err(|error| format!("could not create temp repo `{prefix}`: {error}"))
+}
+
+pub fn materialize_seed(workspace: &Path, case: &str, prefix: &str) -> Result<RepoDir, String> {
+    let root = temp_repo(prefix)?;
+    copy_dir_all(&seed_case_path(workspace, case), root.path())?;
+    Ok(root)
+}
+
 pub fn fixture_paths(workspace: &Path) -> Result<Vec<Fixture>, String> {
-    let root = workspace.join("tests").join("fixtures");
+    let root = fixture_root(workspace);
     let mut paths = fs::read_dir(&root)
         .map_err(|error| format!("could not read fixture root {}: {error}", root.display()))?
         .map(|entry| entry.map(|entry| entry.path()))
@@ -245,6 +302,52 @@ pub fn display_fixture(fixture: &Path) -> String {
         .and_then(|name| name.to_str())
         .unwrap_or("<unknown>")
         .to_owned()
+}
+
+pub fn copy_dir_all(source: &Path, destination: &Path) -> Result<(), String> {
+    let entries = fs::read_dir(source).map_err(|error| {
+        format!(
+            "could not read source directory {}: {error}",
+            source.display()
+        )
+    })?;
+    fs::create_dir_all(destination).map_err(|error| {
+        format!(
+            "could not create directory {}: {error}",
+            destination.display()
+        )
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            format!(
+                "could not read directory entry in {}: {error}",
+                source.display()
+            )
+        })?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let file_type = entry.file_type().map_err(|error| {
+            format!(
+                "could not read entry type {}: {error}",
+                source_path.display()
+            )
+        })?;
+
+        if file_type.is_dir() {
+            copy_dir_all(&source_path, &destination_path)?;
+        } else {
+            fs::copy(&source_path, &destination_path).map_err(|error| {
+                format!(
+                    "could not copy {} to {}: {error}",
+                    source_path.display(),
+                    destination_path.display()
+                )
+            })?;
+        }
+    }
+
+    Ok(())
 }
 
 fn read_text_file(
@@ -404,19 +507,15 @@ mod tests {
     #[test]
     fn fixture_discovery_uses_manifest_authority() {
         let workspace = temp_workspace("fixture_discovery_uses_manifest_authority");
-        let alpha = workspace.join("tests/fixtures/alpha");
-        let beta = workspace.join("tests/fixtures/beta");
+        let alpha = fixture_root(&workspace).join("alpha");
+        let beta = fixture_root(&workspace).join("beta");
         write(&beta, "commands.txt", "query\n");
         write(&beta, "query.symbol", "VetClinic.Domain.Resources.Pet\n");
         write(&beta, "expected.query.exit", "0\n");
         write(&alpha, "commands.txt", "check\ngraph\n");
         write(&alpha, "expected.check.exit", "0\n");
         write(&alpha, "expected.graph.exit", "0\n");
-        write(
-            &workspace.join("tests/fixtures"),
-            "README.md",
-            "# fixtures\n",
-        );
+        write(&fixture_root(&workspace), "README.md", "# fixtures\n");
 
         let fixtures = fixture_paths(&workspace).expect("fixtures");
 
@@ -467,7 +566,7 @@ mod tests {
     #[test]
     fn fixture_discovery_rejects_orphaned_expected_files_and_query_symbol() {
         let workspace = temp_workspace("fixture_discovery_rejects_orphans");
-        let orphaned_expected = workspace.join("tests/fixtures/orphaned-expected");
+        let orphaned_expected = fixture_root(&workspace).join("orphaned-expected");
         write(&orphaned_expected, "commands.txt", "check\n");
         write(&orphaned_expected, "expected.check.exit", "0\n");
         write(&orphaned_expected, "expected.graph.exit", "0\n");
@@ -478,7 +577,7 @@ mod tests {
         );
 
         let workspace = temp_workspace("fixture_discovery_rejects_query_symbol");
-        let orphaned_query = workspace.join("tests/fixtures/orphaned-query");
+        let orphaned_query = fixture_root(&workspace).join("orphaned-query");
         write(&orphaned_query, "commands.txt", "check\n");
         write(&orphaned_query, "expected.check.exit", "0\n");
         write(
@@ -496,7 +595,7 @@ mod tests {
     #[test]
     fn fixture_discovery_rejects_unexpected_expected_file_names() {
         let workspace = temp_workspace("fixture_discovery_rejects_unexpected_expected_files");
-        let fixture = workspace.join("tests/fixtures/unexpected");
+        let fixture = fixture_root(&workspace).join("unexpected");
         write(&fixture, "commands.txt", "graph\n");
         write(&fixture, "expected.graph.exit", "0\n");
         write(&fixture, "expected.graph.stdout", "{}\n");
@@ -579,7 +678,12 @@ mod tests {
     }
 
     fn temp_workspace(name: &str) -> PathBuf {
-        temp_dir(name)
+        let path = temp_dir(name);
+        fs::create_dir_all(fixture_root(&path)).expect("fixture root");
+        fs::create_dir_all(seed_root(&path)).expect("seed root");
+        fs::create_dir_all(path.join("xtask")).expect("xtask dir");
+        fs::write(path.join("Cargo.toml"), "[workspace]\n").expect("workspace cargo");
+        path
     }
 
     fn temp_fixture(name: &str) -> PathBuf {

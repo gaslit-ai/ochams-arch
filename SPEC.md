@@ -1563,7 +1563,7 @@ Owns command parsing, exit codes, stream selection, and terminal policy. It dele
 
 ### `ochams-fixtures`
 
-Owns shared golden fixture contract parsing for workspace tests and maintainer tooling. It reads fixture manifests, validates expected-output file naming, and loads expected streams. It must not run the compiler or decide command behavior.
+Owns shared repository fixture and seed support for workspace tests and maintainer tooling. It finds the workspace root, reads fixture manifests, validates expected-output file naming, loads expected streams, materializes semantic seed repositories into temporary working trees, and builds command argv for public CLI fixture execution. It must not run the compiler or decide command behavior.
 
 ### `xtask`
 
